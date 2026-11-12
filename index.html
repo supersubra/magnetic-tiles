@@ -34,15 +34,22 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
   box-shadow:0 6px 0 #1e9c3f;display:flex;align-items:center;justify-content:center;gap:12px;margin-top:10px}
 
 /* inventory */
-.rows{display:flex;flex-direction:column;gap:10px;max-width:640px;margin:0 auto;width:100%}
-.row{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:24px;padding:8px 12px;
+.rows{display:grid;grid-template-columns:1fr;gap:8px;max-width:640px;margin:0 auto;width:100%;padding:0 2px}
+@media (min-width:700px){.rows{grid-template-columns:1fr 1fr;max-width:900px}}
+.namebox{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:640px;margin:12px auto 6px;width:calc(100% - 4px);
+  background:#fff7d6;border-radius:24px;padding:10px 14px;font-size:clamp(17px,4.8vw,22px);font-weight:900;box-shadow:0 4px 0 rgba(29,42,68,.12)}
+.namebox span{flex:1;min-width:150px}
+.namebox input{flex:1 1 180px;min-width:0;height:54px;border-radius:16px;border:3px solid var(--o);padding:0 14px;font:inherit;font-size:24px;
+  color:var(--ink);background:#fff;user-select:text;-webkit-user-select:text;outline:none}
+.namebox input:focus{border-color:var(--b)}
+.row{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:22px;padding:6px 10px;
   box-shadow:0 4px 0 rgba(29,42,68,.12)}
-.row svg{width:54px;height:54px;flex:none}
-.row .nm{flex:1;min-width:0;font-weight:800;font-size:clamp(15px,4.4vw,22px);line-height:1.1}
-.pm{width:54px;height:54px;border-radius:50%;font-size:36px;font-weight:900;line-height:1;color:#fff;flex:none;
+.row svg{width:46px;height:46px;flex:none}
+.row .nm{flex:1;min-width:0;font-weight:800;font-size:clamp(14px,4vw,20px);line-height:1.1}
+.pm{width:50px;height:50px;border-radius:50%;font-size:36px;font-weight:900;line-height:1;color:#fff;flex:none;
   display:grid;place-items:center;box-shadow:0 4px 0 rgba(0,0,0,.2)}
 .pm.minus{background:var(--r)} .pm.plus{background:var(--g)}
-.cnt{width:50px;text-align:center;font-size:36px;font-weight:900;flex:none}
+.cnt{width:46px;text-align:center;font-size:32px;font-weight:900;flex:none}
 .cnt.bump{animation:bump .18s}
 @keyframes bump{50%{transform:scale(1.35)}}
 
@@ -63,8 +70,12 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 .card .nm{font-size:clamp(18px,5vw,26px);font-weight:900;margin-top:4px}
 .card .badge{position:absolute;top:12px;right:12px;width:38px;height:38px;border-radius:50%;background:var(--g);color:#fff;
   font-size:22px;font-weight:900;display:grid;place-items:center;box-shadow:0 3px 0 rgba(0,0,0,.18)}
-.card.short canvas{opacity:.45;filter:grayscale(.5)}
-.card.short .badge{background:var(--o)}
+.card.locked canvas{opacity:.35;filter:grayscale(1)}
+.card.locked .nm{opacity:.45}
+.card.locked .badge{background:var(--r)}
+.card .star{position:absolute;top:10px;left:12px;font-size:30px;line-height:1;filter:drop-shadow(0 2px 0 rgba(0,0,0,.2))}
+.card.shake{animation:shake .35s}
+@keyframes shake{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
 .miss{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;min-height:30px;margin-top:2px;font-weight:900;font-size:16px;color:#c0392b}
 .miss span{display:inline-flex;align-items:center;gap:2px}
 .miss svg{width:26px;height:26px}
@@ -119,7 +130,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 .splat{position:absolute;border-radius:50%;filter:blur(14px);opacity:.75;pointer-events:none}
 .graf{flex:none;text-align:center;font-family:"Marker Felt","Chalkboard SE","Comic Sans MS","Arial Rounded MT Bold",system-ui,sans-serif;
   font-weight:900;line-height:.95;margin-top:4px;position:relative;z-index:2}
-.graf .ln{display:block;font-size:clamp(60px,21vw,150px);white-space:nowrap}
+.graf .ln{display:block;font-size:clamp(48px,17vw,120px);white-space:nowrap}
 .graf .ln span{display:inline-block;position:relative;-webkit-text-stroke:3px #fff;paint-order:stroke fill;
   text-shadow:4px 4px 0 #111,8px 8px 0 rgba(0,0,0,.45);animation:pop .5s both cubic-bezier(.2,1.6,.4,1)}
 .graf .ln span.drip::after{content:"";position:absolute;left:45%;top:82%;width:.09em;height:0;border-radius:0 0 1em 1em;
@@ -128,7 +139,16 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 @keyframes pop{from{transform:scale(0) rotate(-40deg);opacity:0}}
 .tag{display:inline-block;margin-top:10px;font-size:clamp(22px,6.5vw,40px);color:var(--y);transform:rotate(-4deg);
   text-shadow:2px 2px 0 #111;animation:pop .5s 1s both}
-#doneCv{flex:1;min-height:0;width:100%;display:block;position:relative;z-index:2}
+.pair{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:3cqw;position:relative;z-index:2;container-type:size;margin:6px 0}
+.cell{width:min(47cqw,94cqh);aspect-ratio:1/1;flex:none;border-radius:22px;position:relative;overflow:hidden}
+.cell:first-child{background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 3px rgba(255,255,255,.35)}
+.pic{background:#fff;box-shadow:0 6px 0 rgba(0,0,0,.35);transform:rotate(3deg);container-type:size;display:grid;place-items:center;
+  animation:pop .5s .5s both cubic-bezier(.2,1.6,.4,1)}
+.pic span{font-size:68cqmin;line-height:1}
+.pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#doneCv{width:100%;height:100%;display:block}
+.tag.new{display:block;width:max-content;margin:8px auto 0;color:#fff;background:var(--g);border-radius:99px;padding:4px 16px;
+  font-size:clamp(16px,4.6vw,26px);text-shadow:none;transform:rotate(2deg);animation:pop .5s 1.4s both}
 #confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
 .donebtns{flex:none;display:flex;gap:12px;justify-content:center;position:relative;z-index:4}
 .donebtns .big{flex:1;max-width:300px;margin:0}
@@ -141,7 +161,12 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 <section class="screen on" id="inv">
   <div class="bar"><span class="round ghost"></span><h1>🧲 My Tiles</h1><button class="round mute" aria-label="Sound">🔊</button></div>
   <p class="sub">How many do you have?</p>
-  <div class="fill"><div class="rows" id="rows"></div></div>
+  <div class="fill">
+    <div class="rows" id="rows"></div>
+    <label class="namebox">✏️ <span>What is your name?</span>
+      <input id="kidName" type="text" maxlength="12" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Type your name">
+    </label>
+  </div>
   <button class="big" id="invGo" aria-label="Next">Go ▶</button>
 </section>
 
@@ -182,7 +207,10 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 <!-- 6. celebration -->
 <section class="screen" id="done">
   <div class="graf" id="graf"></div>
-  <canvas id="doneCv"></canvas>
+  <div class="pair">
+    <div class="cell"><canvas id="doneCv"></canvas></div>
+    <div class="cell pic" id="donePic"></div>
+  </div>
   <div class="donebtns">
     <button class="big" id="doneAgain">↻ Again</button>
     <button class="big" id="doneMore">More ▶</button>
@@ -198,11 +226,25 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 const SWIPE_RIGHT_IS_NEXT = true;      // swipe finger to the right = next step
 const COL = {r:'#ff453a',o:'#ff9f0a',y:'#ffd60a',g:'#30d158',b:'#0a84ff',p:'#bf5af2',k:'#ff6fae',t:'#40c8e0'};
 const SHAPES = [
-  {id:'sq',  name:'Square',          col:'r', def:20},
-  {id:'eq',  name:'Triangle',        col:'g', def:8},
-  {id:'rt',  name:'Corner triangle', col:'b', def:4},
-  {id:'iso', name:'Tall triangle',   col:'p', def:8},
-  {id:'wh',  name:'Wheels',          col:'o', def:2}
+  {id:'sq',   name:'Square',                col:'r', def:28},
+  {id:'win',  name:'Window / door',         col:'t', def:12},
+  {id:'iso',  name:'Tall triangle',         col:'p', def:10},
+  {id:'siso', name:'Short pointy triangle', col:'k', def:16},
+  {id:'eq',   name:'Triangle',              col:'g', def:27},
+  {id:'rect', name:'Rectangle',             col:'y', def:4},
+  {id:'bsq',  name:'Big square',            col:'b', def:4},
+  {id:'rt',   name:'Corner triangle',       col:'o', def:16},
+  {id:'wh',   name:'Wheels',                col:'o', def:2}
+];
+// a window / door tile is the same size as a square, so it can stand in for one
+const have=id=>id==='sq'?inv.sq+inv.win:inv[id];
+const CHEERS = [
+  ['HOORAY','You have done it!'],      ['WELL DONE','What a builder!'],
+  ['SUPER','That looks amazing!'],     ['WOW','You built it all!'],
+  ['BRAVO','Great building!'],         ['AWESOME','You are a star!'],
+  ['YOU ROCK','High five!'],           ['FANTASTIC','You did every step!'],
+  ['GREAT JOB','Clever hands!'],       ['TA-DA','Look what you made!'],
+  ['BRILLIANT','Top builder!'],        ['YIPPEE','You finished it!']
 ];
 const SIZES = [{id:'small',name:'Small'},{id:'medium',name:'Medium'},{id:'large',name:'Big'}];
 
@@ -331,6 +373,21 @@ const MODELS = [
   st('Two flat triangles make the flippers.',eq([0,0,0],X,NZ,'o'),eq([0,0,1],X,Z,'o')),
   st('One more triangle makes the tail.',eq([0,0,0],Z,NX,'o'))];})()},
 
+{id:'gift',name:'Present',emoji:'🎁',size:'small',steps:[
+  st('Put a square flat on the floor.',fl(0,0,0,'r')),
+  st('Make a corner with two squares.',wz(0,0,0,'r'),wx(0,0,0,'k')),
+  st('Two more squares make a box.',wx(1,0,0,'k'),wz(0,0,1,'r')),
+  st('Put a square on top for the lid.',fl(0,1,0,'r')),
+  st('Two triangles on top make the bow.',eq([0,1,0],X,Y,'y'),eq([0,1,1],X,Y,'y'))]},
+
+{id:'bunny',name:'Bunny',emoji:'🐇',kind:'animal',size:'small',steps:[
+  st('Make a corner with two squares.',wz(0,0,0,'k'),wx(0,0,0,'p')),
+  st('Two more squares make a box.',wx(1,0,0,'p'),wz(0,0,1,'k')),
+  st('Put a square on top.',fl(0,1,0,'k')),
+  st('Stand two tall triangles up for long ears.',iso([0,1,0],Z,Y,'p'),iso([1,1,0],Z,Y,'p')),
+  st('A flat triangle at the front makes the feet.',eq([0,0,1],X,Z,'y')),
+  st('A flat triangle at the back makes the tail.',eq([0,1,0],X,NZ,'y'))]},
+
 /* ---------- medium ---------- */
 {id:'rocket',name:'Rocket',emoji:'🚀',size:'medium',steps:(()=>{const t=pyr(0,2,0,['r','o','r','o'],'iso');return[
   st('Make a corner with two squares.',wz(0,0,0,'b'),wx(0,0,0,'t')),
@@ -358,7 +415,7 @@ const MODELS = [
   st('Lean two tall triangles together on top.',t[0],t[2]),
   st('Two more tall triangles finish the tower.',t[1],t[3])];})()},
 
-{id:'dog',kind:'animal',name:'Dog',emoji:'🐶',size:'medium',steps:[
+{id:'dog',kind:'animal',name:'Dog',emoji:'🐕',size:'medium',steps:[
   st('Stand two squares up for legs.',wx(0,0,0,'o'),wx(2,0,0,'o')),
   st('Lay two squares on top like a bridge.',fl(0,1,0,'y'),fl(1,1,0,'y')),
   st('Stand two squares along the back side.',wz(0,1,0,'o'),wz(1,1,0,'o')),
@@ -427,6 +484,26 @@ const MODELS = [
   st('A square on each side makes big ears.',wx(2,1,-1,'k'),wx(2,1,1,'k')),
   st('Lean a tall triangle down for the trunk.',iso([2,1,0],Z,DOWN_FRONT,'p')),
   st('One triangle makes the tail.',eq([0,2,0],Z,NX,'p'))]},
+
+{id:'truck',name:'Truck',emoji:'🚚',size:'medium',steps:[
+  st('Put two wheels in a row.',wheel(0,0,'b'),wheel(1,0,'b')),
+  st('Make a box on the back wheels.',box(0,H,'o','y')),
+  st('Make the box taller.',box(0,H+1,'o','y')),
+  st('Put a square on top of the box.',fl(0,H+2,0,'r')),
+  st('Stand a square on each side of the front wheels.',wz(1,H,0,'b'),wz(1,H,1,'b')),
+  st('Stand a square at the front.',wx(2,H,0,'t')),
+  st('Put a square on top for the roof.',fl(1,H+1,0,'r'))]},
+
+{id:'whale',name:'Whale',emoji:'🐳',kind:'animal',size:'medium',steps:(()=>{const n=nose(2,0,0,['b','t','b','t']);return[
+  st('Put two squares flat in a row.',fl(0,0,0,'b'),fl(1,0,0,'b')),
+  st('Stand two squares along the back side.',wz(0,0,0,'b'),wz(1,0,0,'b')),
+  st('Stand two squares along the front side.',wz(0,0,1,'b'),wz(1,0,1,'b')),
+  st('Put two squares on top.',fl(0,1,0,'t'),fl(1,1,0,'t')),
+  st('Close the back with a square.',wx(0,0,0,'t')),
+  st('Two triangles start the head.',n[0],n[2]),
+  st('Two more triangles finish the head.',n[1],n[3]),
+  st('Two corner triangles make the tail.',rt([0,0,0],NX,Y,'p'),rt([0,0,1],NX,Y,'p')),
+  st('A triangle on top makes the water spout.',eq([1,1,0],Z,Y,'k'))];})()},
 
 /* ---------- large ---------- */
 {id:'airplane',name:'Airplane',emoji:'✈️',size:'large',steps:(()=>{const n=nose(3,0,0,['r','o','r','o']);return[
@@ -546,8 +623,39 @@ const MODELS = [
   st('Two more squares close the head.',wx(3,1,0,'r'),wz(2,1,1,'o')),
   st('Put a square on top of the head.',fl(2,2,0,'o')),
   st('Two triangles make the feelers.',eq([2,2,0],X,Y,'p'),eq([2,2,1],X,Y,'p')),
-  st('One triangle makes the tail.',eq([0,1,0],Z,NX,'p'))]}
+  st('One triangle makes the tail.',eq([0,1,0],Z,NX,'p'))]},
+
+{id:'factory',name:'Factory',emoji:'🏭',size:'large',steps:[
+  st('Stand two squares in a row.',wz(0,0,0,'o'),wz(1,0,0,'o')),
+  st('Stand two more squares across from them.',wz(0,0,1,'o'),wz(1,0,1,'o')),
+  st('Close both ends with squares.',wx(0,0,0,'y'),wx(2,0,0,'y')),
+  st('Put two squares on top for the roof.',fl(0,1,0,'b'),fl(1,1,0,'b')),
+  st('Make a box on the roof for the chimney.',box(0,1,'r','k')),
+  st('Make the chimney taller.',box(0,2,'r','k')),
+  st('Two corner triangles finish the roof.',rt([1,1,0],X,Y,'t'),rt([1,1,1],X,Y,'t'))]},
+
+{id:'unicorn',name:'Unicorn',emoji:'🦄',kind:'animal',size:'large',steps:(()=>{const n=nose(2,2,0,['k','p','k','p']);return[
+  st('Stand two squares up for legs.',wx(0,0,0,'k'),wx(2,0,0,'k')),
+  st('Lay two squares on top like a bridge.',fl(0,1,0,'p'),fl(1,1,0,'p')),
+  st('Stand two squares along the back side.',wz(0,1,0,'t'),wz(1,1,0,'k')),
+  st('Stand two squares along the front side.',wz(0,1,1,'t'),wz(1,1,1,'k')),
+  st('Put two squares on top.',fl(0,2,0,'p'),fl(1,2,0,'p')),
+  st('Close both ends with squares.',wx(0,1,0,'t'),wx(2,1,0,'t')),
+  st('Stand a square on top for the neck.',wx(2,2,0,'k')),
+  st('Two triangles start the head.',n[0],n[2]),
+  st('Two more triangles finish the head.',n[1],n[3]),
+  st('A tall triangle on top makes the horn.',iso([2,3,0],Z,Y,'y')),
+  st('Lean a tall triangle down for the tail.',iso([0,1,0],Z,DOWN_BACK,'b'))];})()}
 ];
+
+/* The order builds appear in. Every row of three is one group: two things and one animal.
+   A group opens only when every build in the group before it has been finished. */
+const ORDER = {
+  small: ['tent','house','fish',  'tree','boat','turtle',  'car','crown','bird',  'bridge','gift','bunny'],
+  medium:['rocket','tower','dog',  'ship','barn','crocodile',  'train','bus','elephant',  'helicopter','truck','whale'],
+  large: ['airplane','robot','giraffe',  'castle','skyscraper','caterpillar',  'church','pirate','dinosaur',  'submarine','factory','unicorn']
+};
+const GROUP = 3;
 
 /* pre-compute everything the renderer needs */
 function prep(m){
@@ -661,6 +769,10 @@ function icon(s,c){
     eq:`<polygon points="32,10 56,52 8,52" ${a}/><polygon points="32,24 45,46 19,46" ${b}/>`,
     rt:`<polygon points="10,10 10,54 54,54" ${a}/><polygon points="17,27 17,47 37,47" ${b}/>`,
     iso:`<polygon points="32,5 45,59 19,59" ${a}/><polygon points="32,24 39,53 25,53" ${b}/>`,
+    win:`<rect x="9" y="9" width="46" height="46" rx="4" ${a}/><path d="M32 13V51M13 32H51" stroke="#fff" stroke-opacity=".85" stroke-width="4"/>`,
+    siso:`<polygon points="32,14 48,56 16,56" ${a}/><polygon points="32,30 40,50 24,50" ${b}/>`,
+    rect:`<rect x="19" y="6" width="26" height="52" rx="4" ${a}/><rect x="25" y="13" width="14" height="38" rx="2" ${b}/>`,
+    bsq:`<rect x="5" y="5" width="54" height="54" rx="4" ${a}/><path d="M32 9V55M9 32H55" ${b}/>`,
     wh:`<rect x="8" y="16" width="48" height="22" rx="5" ${a}/><circle cx="19" cy="45" r="10" fill="#2b2f3a"/><circle cx="45" cy="45" r="10" fill="#2b2f3a"/><circle cx="19" cy="45" r="4" fill="#d9dde6"/><circle cx="45" cy="45" r="4" fill="#d9dde6"/>`
   }[s];
   return `<svg viewBox="0 0 64 64" aria-hidden="true">${body}</svg>`;
@@ -707,7 +819,7 @@ paintMute();
    App state + screens
    ============================================================ */
 const $=id=>document.getElementById(id);
-const inv=Object.assign({},...SHAPES.map(s=>({[s.id]:s.def})),store.get('inv',{}));
+const inv=Object.assign({},...SHAPES.map(s=>({[s.id]:s.def})),store.get('inv2',{}));
 let screen='inv', size='small', model=null, stepI=0, animT=null, spin=0, previews=[];
 
 function show(id){
@@ -715,7 +827,14 @@ function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
 }
 document.querySelectorAll('.back').forEach(b=>b.onclick=()=>{click();show(b.dataset.to);if(b.dataset.to==='pick')buildPick();});
-const missing=m=>SHAPES.map(s=>({s,n:Math.max(0,m.need[s.id]-inv[s.id])})).filter(x=>x.n>0);
+let finished=new Set(store.get('done',[])), openAll=store.get('all',false);
+// how many builds of this size can be played right now
+function unlocked(sz){
+  const ids=ORDER[sz]; if(openAll) return ids.length;
+  let g=0; while((g+1)*GROUP<=ids.length && ids.slice(g*GROUP,(g+1)*GROUP).every(id=>finished.has(id))) g++;
+  return Math.min(ids.length,(g+1)*GROUP);
+}
+const missing=m=>SHAPES.map(s=>({s,n:Math.max(0,(m.need[s.id]||0)-have(s.id))})).filter(x=>x.n>0);
 
 /* ---- 1. inventory ---- */
 function buildInv(){
@@ -727,7 +846,7 @@ function buildInv(){
     let timer=null, rep=null;
     const bump=()=>{
       const k=b.dataset.s, v=Math.max(0,Math.min(99,inv[k]+ +b.dataset.d));
-      if(v===inv[k]) return; inv[k]=v; store.set('inv',inv);
+      if(v===inv[k]) return; inv[k]=v; store.set('inv2',inv);
       const el=$('cnt_'+k); el.textContent=v; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); click();
     };
     const stop=()=>{clearTimeout(timer);clearInterval(rep);timer=rep=null;};
@@ -735,6 +854,10 @@ function buildInv(){
     ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,stop));
   });
 }
+let kid=store.get('kid','');
+$('kidName').value=kid;
+$('kidName').addEventListener('input',e=>{kid=e.target.value.replace(/[^\p{L}\p{N} '-]/gu,'').trim().slice(0,12);store.set('kid',kid);});
+$('kidName').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur();});
 $('invGo').onclick=()=>{click();show('size');};
 
 /* ---- 2. size ---- */
@@ -743,27 +866,40 @@ $('sizes').querySelectorAll('.sizebtn').forEach(b=>b.onclick=()=>{click();size=b
 
 /* ---- 3. pick ---- */
 function buildPick(){
-  const list=MODELS.filter(m=>m.size===size).sort((a,b)=>missing(a).length-missing(b).length);
-  $('pickTitle').textContent='Pick one!';
-  $('grid').innerHTML=list.map(m=>{
-    const ms=missing(m);
-    return `<button class="card ${ms.length?'short':''}" data-id="${m.id}" aria-label="${m.name}">
-      <canvas></canvas><div class="badge">${ms.length?'!':'✓'}</div><div class="nm">${m.emoji} ${m.name}</div>
-      <div class="miss">${ms.map(x=>`<span>+${x.n}${icon(x.s.id,x.s.col)}</span>`).join('')}</div></button>`;
+  const list=ORDER[size].map(id=>MODELS.find(m=>m.id===id)), open=unlocked(size);
+  $('pickTitle').textContent=(openAll?'🔓 ':'')+'Pick one!';
+  $('grid').innerHTML=list.map((m,i)=>{
+    const ms=missing(m), lock=i>=open;
+    return `<button class="card ${lock?'locked':''}" data-id="${m.id}" aria-label="${m.name}${lock?' (locked)':''}">
+      <canvas></canvas><div class="badge">${lock?'✕':'✓'}</div>${finished.has(m.id)?'<div class="star">⭐</div>':''}
+      <div class="nm">${m.emoji} ${m.name}</div>
+      <div class="miss">${lock?'':ms.map(x=>`<span>+${x.n}${icon(x.s.id,x.s.col)}</span>`).join('')}</div></button>`;
   }).join('');
   previews=[];
   $('grid').querySelectorAll('.card').forEach((c,i)=>{
     const m=MODELS.find(x=>x.id===c.dataset.id);
     previews.push({cv:c.querySelector('canvas'),m,ph:i*.9});
-    c.onclick=()=>{click();model=m;buildNeed();show('need');speak(m.name);};
+    c.onclick=()=>{
+      if(i>=open){
+        tone(180,0,.18,'square',.12); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+        speak('Finish the ones with a green tick first.'); return;
+      }
+      click();model=m;buildNeed();show('need');speak(m.name);
+    };
   });
 }
+// grown-ups: hold the title for two seconds to open (or re-lock) every build
+(()=>{let t=null;const el=$('pickTitle');
+  const stop=()=>{clearTimeout(t);t=null;};
+  el.addEventListener('pointerdown',()=>{stop();t=setTimeout(()=>{openAll=!openAll;store.set('all',openAll);click();buildPick();},2000);});
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,stop));
+})();
 
 /* ---- 4. tiles needed ---- */
 function buildNeed(){
   $('needTitle').textContent=model.emoji+' '+model.name;
   $('needList').innerHTML=SHAPES.filter(s=>model.need[s.id]).map(s=>{
-    const n=model.need[s.id], lack=Math.max(0,n-inv[s.id]);
+    const n=model.need[s.id], lack=Math.max(0,n-have(s.id));
     return `<div class="need ${lack?'bad':''}">${icon(s.id,s.col)}<b>× ${n}</b><i>${lack?'⚠️':'✅'}</i>${lack?`<small>${lack} more</small>`:''}</div>`;
   }).join('');
 }
@@ -815,14 +951,23 @@ document.addEventListener('keydown',e=>{
 /* ---- 6. celebration ---- */
 let parts=[], doneT=0;
 function finish(){
+  const before=unlocked(model.size);
+  finished.add(model.id); store.set('done',[...finished]);
+  const opened=unlocked(model.size)>before;
   show('done'); doneT=performance.now();
-  const cols=Object.values(COL), lines=['YOU','DID IT!'];
+  // the real thing, next to the tile model. A photo at images/<id>.jpg is used when there is one.
+  $('donePic').innerHTML=`<span>${model.emoji}</span><img alt="${model.name}" src="images/${model.id}.jpg" onerror="this.remove()">`;
+  // a different cheer every time, in turn
+  const turn=store.get('cheer',0), [cheer,extra]=CHEERS[turn%CHEERS.length]; store.set('cheer',turn+1);
+  const esc=t=>t.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const cols=Object.values(COL), lines=kid?[cheer,kid.toUpperCase()+'!']:[cheer+'!','YOU DID IT!'];
+  const fs=Math.min(17,84/(Math.max(...lines.map(l=>l.length))*.8));
   let k=0;
-  $('graf').innerHTML=lines.map(l=>`<span class="ln">${[...l].map(ch=>{
+  $('graf').innerHTML=lines.map(l=>`<span class="ln" style="font-size:clamp(30px,${fs.toFixed(1)}vw,120px)">${[...l].map(ch=>{
     if(ch===' ') return '&nbsp;';
     const c=cols[(k*3+1)%cols.length], rot=((k*37)%17)-8, d=k*.07; k++;
-    return `<span class="${k%3===0?'drip':''}" style="color:${c};transform:rotate(${rot}deg);animation-delay:${d}s">${ch}</span>`;
-  }).join('')}</span>`).join('')+`<span class="tag">★ ${model.emoji} ${model.name} ★</span>`;
+    return `<span class="${k%3===0?'drip':''}" style="color:${c};transform:rotate(${rot}deg);animation-delay:${d}s">${esc(ch)}</span>`;
+  }).join('')}</span>`).join('')+`<span class="tag">★ ${extra} ★</span>`+(opened?`<span class="tag new">🔓 New ones to build!</span>`:'');
   document.querySelectorAll('#done .splat').forEach(s=>s.remove());
   for(let i=0;i<7;i++){
     const s=document.createElement('div'); s.className='splat';
@@ -831,7 +976,7 @@ function finish(){
     $('done').prepend(s);
   }
   parts=[]; burst(140);
-  fanfare(); setTimeout(()=>speak('You did it! You built a '+model.name+'!'),700);
+  fanfare(); setTimeout(()=>speak(cheer+(kid?', '+kid:'')+'! '+extra+' You built a '+model.name+'!'+(opened?' You opened new ones to build!':'')),700);
 }
 function burst(n){
   const cols=Object.values(COL);

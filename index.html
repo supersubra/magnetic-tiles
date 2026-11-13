@@ -28,6 +28,16 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
   box-shadow:0 4px 0 rgba(29,42,68,.18);display:grid;place-items:center}
 .round:active,.big:active,.pm:active,.sizebtn:active,.card:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(29,42,68,.18)}
 .round.ghost{visibility:hidden}
+.lockrow{flex:none;display:flex;align-items:center;gap:10px;max-width:640px;width:calc(100% - 4px);margin:0 auto 8px;background:#fff;
+  border-radius:20px;padding:8px 14px;font-weight:900;font-size:clamp(15px,4.4vw,20px);box-shadow:0 4px 0 rgba(29,42,68,.12)}
+.lockrow span{flex:1}
+.lockrow input{position:absolute;opacity:0;width:1px;height:1px}
+.lockrow i{width:66px;height:38px;border-radius:99px;background:#c5ccd8;position:relative;flex:none;transition:background .15s}
+.lockrow i::after{content:"";position:absolute;top:4px;left:4px;width:30px;height:30px;border-radius:50%;background:#fff;
+  box-shadow:0 2px 3px rgba(0,0,0,.3);transition:transform .15s}
+.lockrow input:checked+i{background:var(--g)}
+.lockrow input:checked+i::after{transform:translateX(28px)}
+.lockrow input:focus-visible+i{outline:3px solid var(--b)}
 .sub{text-align:center;font-size:clamp(15px,4.2vw,20px);font-weight:700;opacity:.7;margin:0 0 8px}
 .fill{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .big{flex:none;height:72px;border-radius:26px;background:var(--g);color:#fff;font-size:30px;font-weight:900;
@@ -160,6 +170,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 <!-- 1. inventory -->
 <section class="screen on" id="inv">
   <div class="bar"><span class="round ghost"></span><h1>🧲 My Tiles</h1><button class="round mute" aria-label="Sound">🔊</button></div>
+  <label class="lockrow"><span>🔒 Open builds 3 at a time</span><input type="checkbox" id="lockSw" role="switch"><i></i></label>
   <p class="sub">How many do you have?</p>
   <div class="fill">
     <div class="rows" id="rows"></div>
@@ -234,7 +245,7 @@ const SHAPES = [
   {id:'rect', name:'Rectangle',             col:'y', def:4},
   {id:'bsq',  name:'Big square',            col:'b', def:4},
   {id:'rt',   name:'Corner triangle',       col:'o', def:16},
-  {id:'wh',   name:'Wheels',                col:'o', def:2}
+  {id:'wh',   name:'Wheel base',            col:'o', def:1}
 ];
 // a window / door tile is the same size as a square, so it can stand in for one
 const have=id=>id==='sq'?inv.sq+inv.win:inv[id];
@@ -279,14 +290,16 @@ function nose(x,y,z,cols,dir){
   return [t[0],t[3],t[2],t[1]];
 }
 function wheel(x,z,c){
-  const t=sq([x,H,z],X,Z,c); t.s='wh'; t.extra=[];
-  for(const wxp of [x+.22,x+.78]) for(const wzp of [z-.1,z+1.1]){
+  const t={s:'wh',c,v:[[x,H,z],[x+2,H,z],[x+2,H,z+1],[x,H,z+1]],extra:[]};
+  for(const wxp of [x+.32,x+1.68]) for(const wzp of [z-.1,z+1.1]){
     const disc=[],hub=[];
     for(let i=0;i<16;i++){const a=i/16*Math.PI*2;
       disc.push([wxp+.27*Math.cos(a),.27+.27*Math.sin(a),wzp]);
       hub.push([wxp+.1*Math.cos(a),.27+.1*Math.sin(a),wzp+(wzp<z?-.01:.01)]);}
     t.extra.push({v:disc,fill:'#2b2f3a'},{v:hub,fill:'#d9dde6'});
   }
+  // the line where the two squares join
+  t.extra.push({v:[[x+.97,H+.004,z+.06],[x+1.03,H+.004,z+.06],[x+1.03,H+.004,z+.94],[x+.97,H+.004,z+.94]],fill:'#ffffff'});
   return t;
 }
 const st=(say,...tiles)=>({say,tiles:tiles.flat()});
@@ -296,8 +309,30 @@ const box=(x,y,a,b)=>[wz(x,y,0,a),wx(x,y,0,b),wx(x+1,y,0,b),wz(x,y,1,a)];
 const LEAN=Math.sqrt(1-1/3.75), DOWN_BACK=[-LEAN,-1/IH,0], DOWN_FRONT=[LEAN,-1/IH,0];
 
 /* ============================================================
-   The builds
+   The builds.  Rules that keep them standing with real tiles:
+   - anything that stands on the floor is a closed box, or is joined to a floor tile
+   - no flat tile hangs in the air by one edge
+   - no square stands up on just one edge (only small triangles do)
+   - tall stacks get a flat square between the levels
+   validateModels() checks these rules for every build.
    ============================================================ */
+// a row of three boxes sharing walls, with a flat top: a wide, solid base
+const podium=(a,b,c)=>[
+  st('Stand three squares in a row.',wz(0,0,0,a),wz(1,0,0,a),wz(2,0,0,a)),
+  st('Stand three more squares across from them.',wz(0,0,1,a),wz(1,0,1,a),wz(2,0,1,a)),
+  st('Close both ends. Put two walls inside.',wx(0,0,0,b),wx(1,0,0,b),wx(2,0,0,b),wx(3,0,0,b)),
+  st('Put three squares on top.',fl(0,1,0,c),fl(1,1,0,c),fl(2,1,0,c))];
+// a body standing on two box legs: the strong way to make an animal with legs
+const beast=(leg,a,b)=>[
+  st('Make a box with four squares for the back legs.',box(0,0,leg,leg)),
+  st('Make another box for the front legs. Leave a gap.',box(2,0,leg,leg)),
+  st('Lay three squares on top like a bridge.',fl(0,1,0,b),fl(1,1,0,b),fl(2,1,0,b)),
+  st('Stand three squares along the back side.',wz(0,1,0,a),wz(1,1,0,b),wz(2,1,0,a)),
+  st('Stand three squares along the front side.',wz(0,1,1,a),wz(1,1,1,b),wz(2,1,1,a)),
+  st('Close both ends with squares.',wx(0,1,0,b),wx(3,1,0,b)),
+  st('Put three squares on top.',fl(0,2,0,a),fl(1,2,0,a),fl(2,2,0,a))];
+const flat=t=>Object.assign(t,{rest:true});   // a tile that just lies on top of another
+
 const MODELS = [
 /* ---------- small ---------- */
 {id:'tent',name:'Tent',emoji:'⛺',size:'small',steps:(()=>{const t=pyr(0,0,0,['o','y','o','y']);return[
@@ -308,10 +343,8 @@ const MODELS = [
   st('Close the tent with the last triangle.',t[2])];})()},
 
 {id:'house',name:'House',emoji:'🏠',size:'small',steps:(()=>{const t=pyr(0,1,0,['r','o','r','o']);return[
-  st('Stand a square up.',wz(0,0,0,'b')),
-  st('Stand a square on the side.',wx(0,0,0,'t')),
-  st('Stand a square on the other side.',wx(1,0,0,'t')),
-  st('Close the box with a square.',wz(0,0,1,'b')),
+  st('Make a corner with two squares.',wz(0,0,0,'b'),wx(0,0,0,'t')),
+  st('Two more squares make a box.',wx(1,0,0,'t'),wz(0,0,1,'b')),
   st('Lean two triangles together for the roof.',t[0],t[2]),
   st('Two more triangles finish the roof.',t[1],t[3])];})()},
 
@@ -321,25 +354,28 @@ const MODELS = [
   st('Lean two tall triangles together.',t[0],t[2]),
   st('Two more tall triangles finish the tree.',t[1],t[3])];})()},
 
-{id:'boat',name:'Boat',emoji:'⛵',size:'small',steps:[
+{id:'boat',name:'Boat',emoji:'⛵',size:'small',steps:(()=>{const t=pyr(0,1,0,['y','k','y','k'],'iso');return[
   st('Put a square flat on the floor.',fl(0,0,0,'b')),
   st('Put a triangle flat at the front.',eq([1,0,0],Z,X,'b')),
   st('Stand a square on each side.',wz(0,0,0,'r'),wz(0,0,1,'r')),
   st('Stand a square at the back.',wx(0,0,0,'r')),
   st('Two squares make the pointy front.',sq([1,0,0],[h,0,.5],Y,'o'),sq([1,0,1],[h,0,-.5],Y,'o')),
-  st('Stand a tall triangle up for the sail.',iso([1,0,0],Z,Y,'y'))]},
+  st('Put a square on top for the deck.',fl(0,1,0,'b')),
+  st('Lean two tall triangles together for the sail.',t[0],t[2]),
+  st('Two more tall triangles finish the sail.',t[1],t[3])];})()},
 
 {id:'car',name:'Car',emoji:'🚗',size:'small',steps:[
-  st('Put the wheels on the floor.',wheel(0,0,'o')),
-  st('Stand a square on each side.',wz(0,H,0,'r'),wz(0,H,1,'r')),
-  st('Stand a square at the front and at the back.',wx(0,H,0,'b'),wx(1,H,0,'b')),
-  st('Put a square on top for the roof.',fl(0,H+1,0,'y'))]},
+  st('Put the wheel base on the floor.',wheel(0,0,'o')),
+  st('Make a corner with two squares at the back.',wz(0,H,0,'r'),wx(0,H,0,'b')),
+  st('Two more squares make a box.',wx(1,H,0,'b'),wz(0,H,1,'r')),
+  st('Put a square on top for the roof.',fl(0,H+1,0,'y')),
+  st('Two corner triangles make the front.',rt([1,H,0],X,Y,'r'),rt([1,H,1],X,Y,'r'))]},
 
 {id:'bridge',name:'Bridge',emoji:'🌉',size:'small',steps:[
-  st('Stand two squares up.',wx(0,0,0,'b'),wx(1,0,0,'b')),
-  st('Lay a square on top.',fl(0,1,0,'r')),
-  st('Stand one more square up. Lay a square on top.',wx(2,0,0,'b'),fl(1,1,0,'o')),
-  st('Do it again to make the bridge long.',wx(3,0,0,'b'),fl(2,1,0,'r')),
+  st('Make a box with four squares.',box(0,0,'b','t')),
+  st('Make another box. Leave a gap.',box(2,0,'b','t')),
+  st('Lay three squares on top to cross the gap.',fl(0,1,0,'r'),fl(1,1,0,'o'),fl(2,1,0,'r')),
+  st('Lean a tall triangle down at each end for ramps.',iso([0,1,0],Z,DOWN_BACK,'p'),iso([3,1,0],Z,DOWN_FRONT,'p')),
   st('Two triangles make the railings.',eq([1,1,0],X,Y,'y'),eq([1,1,1],X,Y,'y'))]},
 
 {id:'crown',name:'Crown',emoji:'👑',size:'small',steps:[
@@ -351,19 +387,21 @@ const MODELS = [
 {id:'fish',name:'Fish',emoji:'🐟',kind:'animal',size:'small',steps:(()=>{const n=nose(1,0,0,['r','o','r','o']);return[
   st('Put a square flat on the floor.',fl(0,0,0,'o')),
   st('Stand a square on each side.',wz(0,0,0,'y'),wz(0,0,1,'y')),
+  st('Close the back with a square.',wx(0,0,0,'o')),
   st('Put a square on top.',fl(0,1,0,'o')),
   st('Two triangles start the nose.',n[0],n[2]),
   st('Two more triangles finish the nose.',n[1],n[3]),
-  st('Two triangles make the tail.',eq([0,0,0],Y,NX,'r'),eq([0,0,1],Y,NX,'r'))];})()},
+  st('Two corner triangles make the tail.',rt([0,0,0],NX,Y,'r'),rt([0,0,1],NX,Y,'r')),
+  st('A triangle on top makes the fin.',eq([0,1,0],X,Y,'r'))];})()},
 
-{id:'bird',name:'Bird',emoji:'🐦',kind:'animal',size:'small',steps:[
-  st('Make a corner with two squares.',wx(1,0,0,'b'),wz(0,0,0,'t')),
-  st('Add one more square.',wz(0,0,1,'t')),
+{id:'bird',name:'Bird',emoji:'🐦',kind:'animal',size:'small',steps:(()=>{const t=pyr(0,1,0,['t','b','t','b']);return[
+  st('Make a corner with two squares.',wz(0,0,0,'b'),wx(0,0,0,'t')),
+  st('Two more squares make a box.',wx(1,0,0,'t'),wz(0,0,1,'b')),
   st('Put a square on top.',fl(0,1,0,'b')),
-  st('Stand a square up for the head.',wx(1,1,0,'t')),
-  st('A flat triangle makes the beak.',eq([1,1,0],Z,X,'o')),
-  st('Two flat triangles make the wings.',eq([0,1,0],X,NZ,'y'),eq([0,1,1],X,Z,'y')),
-  st('One more triangle makes the tail.',eq([0,1,0],Z,NX,'r'))]},
+  st('Lean two triangles together for the head.',t[0],t[2]),
+  st('Two more triangles finish the head.',t[1],t[3]),
+  st('A corner triangle on each side makes the wings.',rt([1,0,0],NZ,Y,'y'),rt([1,0,1],Z,Y,'y')),
+  st('Lean a tall triangle down at the back for the tail.',iso([0,1,0],Z,DOWN_BACK,'r'))];})()},
 
 {id:'turtle',name:'Turtle',emoji:'🐢',kind:'animal',size:'small',steps:(()=>{const t=pyr(0,0,0,['g','y','g','y']);return[
   st('Put a square flat on the floor.',fl(0,0,0,'g')),
@@ -386,12 +424,13 @@ const MODELS = [
   st('Put a square on top.',fl(0,1,0,'k')),
   st('Stand two tall triangles up for long ears.',iso([0,1,0],Z,Y,'p'),iso([1,1,0],Z,Y,'p')),
   st('A flat triangle at the front makes the feet.',eq([0,0,1],X,Z,'y')),
-  st('A flat triangle at the back makes the tail.',eq([0,1,0],X,NZ,'y'))]},
+  st('A flat triangle at the back makes the tail.',eq([0,0,0],X,NZ,'y'))]},
 
 /* ---------- medium ---------- */
 {id:'rocket',name:'Rocket',emoji:'🚀',size:'medium',steps:(()=>{const t=pyr(0,2,0,['r','o','r','o'],'iso');return[
   st('Make a corner with two squares.',wz(0,0,0,'b'),wx(0,0,0,'t')),
   st('Two more squares make a box.',wx(1,0,0,'t'),wz(0,0,1,'b')),
+  st('Lay a square on top. It keeps the rocket strong.',fl(0,1,0,'y')),
   st('Put two squares on top.',wz(0,1,0,'p'),wx(0,1,0,'k')),
   st('Two more squares make it tall.',wx(1,1,0,'k'),wz(0,1,1,'p')),
   st('Lean two tall triangles together on top.',t[0],t[2]),
@@ -399,52 +438,39 @@ const MODELS = [
   st('Add two corner triangles for fins.',rt([0,0,0],NX,Y,'y'),rt([1,0,1],X,Y,'y')),
   st('Add two more fins.',rt([1,0,0],NZ,Y,'y'),rt([0,0,1],Z,Y,'y'))];})()},
 
-{id:'ship',name:'Ship',emoji:'🚢',size:'medium',steps:[
+{id:'tower',name:'Tower',emoji:'🗼',size:'medium',steps:(()=>{const t=pyr(0,3,0,['p','k','p','k'],'iso');return[
+  st('Make a box with four squares.',box(0,0,'b','t')),
+  st('Corner triangles all around keep it steady.',rt([0,0,0],NX,Y,'r'),rt([1,0,1],X,Y,'r'),rt([1,0,0],NZ,Y,'r'),rt([0,0,1],Z,Y,'r')),
+  st('Lay a square on top.',fl(0,1,0,'y')),
+  st('Make another box on top.',box(0,1,'g','y')),
+  st('Lay a square on top again.',fl(0,2,0,'y')),
+  st('Make one more box.',box(0,2,'o','r')),
+  st('Lean two tall triangles together on top.',t[0],t[2]),
+  st('Two more tall triangles finish the tower.',t[1],t[3])];})()},
+
+{id:'dog',kind:'animal',name:'Dog',emoji:'🐕',size:'medium',steps:(()=>{const n=nose(2,1,0,['r','y','r','y']);return[
+  st('Stand two squares in a row.',wz(0,0,0,'o'),wz(1,0,0,'o')),
+  st('Stand two more squares across from them.',wz(0,0,1,'o'),wz(1,0,1,'o')),
+  st('Close both ends with squares.',wx(0,0,0,'y'),wx(2,0,0,'y')),
+  st('Put two squares on top.',fl(0,1,0,'y'),fl(1,1,0,'y')),
+  st('Make a box on top at the front for the head.',box(1,1,'o','y')),
+  st('Put a square on the head.',fl(1,2,0,'o')),
+  st('Two triangles start the nose.',n[0],n[2]),
+  st('Two more triangles finish the nose.',n[1],n[3]),
+  st('Two triangles on the head make the ears.',eq([1,2,0],X,Y,'r'),eq([1,2,1],X,Y,'r')),
+  st('One triangle at the back makes the tail.',eq([0,1,0],Z,Y,'r'))];})()},
+
+{id:'ship',name:'Ship',emoji:'🚢',size:'medium',steps:(()=>{const t=pyr(1,1,0,['y','k','y','k'],'iso');return[
   st('Put three squares flat in a row.',fl(0,0,0,'b'),fl(1,0,0,'b'),fl(2,0,0,'b')),
   st('Put a triangle flat at the front.',eq([3,0,0],Z,X,'b')),
   st('Stand three squares along the back side.',wz(0,0,0,'r'),wz(1,0,0,'r'),wz(2,0,0,'r')),
   st('Stand three squares along the front side.',wz(0,0,1,'r'),wz(1,0,1,'r'),wz(2,0,1,'r')),
   st('Stand a square at the end.',wx(0,0,0,'o')),
   st('Two squares make the pointy front.',sq([3,0,0],[h,0,.5],Y,'o'),sq([3,0,1],[h,0,-.5],Y,'o')),
-  st('Stand two tall triangles up for sails.',iso([1,0,0],Z,Y,'y'),iso([2,0,0],Z,Y,'y'))]},
-
-{id:'tower',name:'Tower',emoji:'🗼',size:'medium',steps:(()=>{const t=pyr(0,3,0,['p','k','p','k'],'iso');const lv=(y,a,b)=>[
-  st(y?'Put two squares on top.':'Make a corner with two squares.',wz(0,y,0,a),wx(0,y,0,b)),
-  st(y?'Two more squares make it taller.':'Two more squares make a box.',wx(1,y,0,b),wz(0,y,1,a))];return[
-  ...lv(0,'b','t'),...lv(1,'g','y'),...lv(2,'o','r'),
-  st('Lean two tall triangles together on top.',t[0],t[2]),
-  st('Two more tall triangles finish the tower.',t[1],t[3])];})()},
-
-{id:'dog',kind:'animal',name:'Dog',emoji:'🐕',size:'medium',steps:[
-  st('Stand two squares up for legs.',wx(0,0,0,'o'),wx(2,0,0,'o')),
-  st('Lay two squares on top like a bridge.',fl(0,1,0,'y'),fl(1,1,0,'y')),
-  st('Stand two squares along the back side.',wz(0,1,0,'o'),wz(1,1,0,'o')),
-  st('Stand two squares along the front side.',wz(0,1,1,'o'),wz(1,1,1,'o')),
-  st('Put two squares on top.',fl(0,2,0,'y'),fl(1,2,0,'y')),
-  st('Two squares make the chest and the face.',wx(2,1,0,'o'),wx(2,2,0,'y')),
-  st('Two corner triangles make floppy ears.',rt([2,3,0],NZ,NY,'r'),rt([2,3,1],Z,NY,'r')),
-  st('A triangle for the nose and one for the tail.',eq([2,2,0],Z,X,'r'),eq([0,2,0],Z,Y,'r'))]},
-
-{id:'train',name:'Train',emoji:'🚂',size:'medium',steps:(()=>{const n=nose(2,H,0,['y','o','y','o']);return[
-  st('Put two wheels in a row.',wheel(0,0,'b'),wheel(1,0,'r')),
-  st('Stand a square on each side of the wagon.',wz(0,H,0,'b'),wz(0,H,1,'b')),
-  st('Stand a square at each end of the wagon.',wx(0,H,0,'t'),wx(1,H,0,'t')),
-  st('Stand a square on each side of the engine.',wz(1,H,0,'r'),wz(1,H,1,'r')),
-  st('Stand a square at the front.',wx(2,H,0,'r')),
-  st('Lean two squares together for the roof.',sq([1,H+1,0],X,[0,h,.5],'g'),sq([1,H+1,1],X,[0,h,-.5],'g')),
-  st('Close the roof with two triangles.',eq([1,H+1,0],Z,Y,'g'),eq([2,H+1,0],Z,Y,'g')),
-  st('Two triangles start the nose.',n[0],n[2]),
-  st('Two more triangles finish the nose.',n[1],n[3])];})()},
-
-{id:'bus',name:'Bus',emoji:'🚌',size:'medium',steps:[
-  st('Put two wheels in a row.',wheel(0,0,'r'),wheel(1,0,'r')),
-  st('Stand two squares along the back side.',wz(0,H,0,'y'),wz(1,H,0,'y')),
-  st('Stand two squares along the front side.',wz(0,H,1,'y'),wz(1,H,1,'y')),
-  st('Close both ends with squares.',wx(0,H,0,'o'),wx(2,H,0,'o')),
-  st('Put two squares on top of the back side.',wz(0,H+1,0,'t'),wz(1,H+1,0,'t')),
-  st('Put two squares on top of the front side.',wz(0,H+1,1,'t'),wz(1,H+1,1,'t')),
-  st('Close both ends again.',wx(0,H+1,0,'b'),wx(2,H+1,0,'b')),
-  st('Two flat squares make the roof.',fl(0,H+2,0,'r'),fl(1,H+2,0,'r'))]},
+  st('Put a square on top in the middle for the deck.',fl(1,1,0,'b')),
+  st('Lean two tall triangles together for the sail.',t[0],t[2]),
+  st('Two more tall triangles finish the sail.',t[1],t[3]),
+  st('A triangle at the back makes the flag.',eq([0,1,0],Z,Y,'g'))];})()},
 
 {id:'barn',name:'Barn',emoji:'🏡',size:'medium',steps:[
   st('Stand two squares in a row.',wz(0,0,0,'r'),wz(1,0,0,'r')),
@@ -454,6 +480,44 @@ const MODELS = [
   st('Lean two more squares together.',sq([1,1,0],X,[0,h,.5],'t'),sq([1,1,1],X,[0,h,-.5],'t')),
   st('Close the roof with two triangles.',eq([0,1,0],Z,Y,'y'),eq([2,1,0],Z,Y,'y'))]},
 
+{id:'crocodile',name:'Crocodile',emoji:'🐊',kind:'animal',size:'medium',steps:(()=>{const n=nose(3,0,0,['g','y','g','y']);return[
+  st('Put three squares flat in a row.',fl(0,0,0,'y'),fl(1,0,0,'y'),fl(2,0,0,'y')),
+  st('Stand three squares along the back side.',wz(0,0,0,'g'),wz(1,0,0,'g'),wz(2,0,0,'g')),
+  st('Stand three squares along the front side.',wz(0,0,1,'g'),wz(1,0,1,'g'),wz(2,0,1,'g')),
+  st('Close both ends with squares.',wx(0,0,0,'y'),wx(3,0,0,'y')),
+  st('Put three squares on top.',fl(0,1,0,'y'),fl(1,1,0,'g'),fl(2,1,0,'y')),
+  st('Two triangles start the snout.',n[0],n[2]),
+  st('Two more triangles finish the snout.',n[1],n[3]),
+  st('Two triangles on top make the eyes.',eq([2,1,0],X,Y,'r'),eq([2,1,1],X,Y,'r')),
+  st('Lean a tall triangle down for the tail.',iso([0,1,0],Z,DOWN_BACK,'g'))];})()},
+
+{id:'train',name:'Train',emoji:'🚂',size:'medium',steps:(()=>{const n=nose(2,H,0,['y','o','y','o']);return[
+  st('Put the wheel base on the floor.',wheel(0,0,'b')),
+  st('Stand a square on each side at the back.',wz(0,H,0,'b'),wz(0,H,1,'b')),
+  st('Close the back. Put one wall in the middle.',wx(0,H,0,'t'),wx(1,H,0,'t')),
+  st('Stand a square on each side at the front.',wz(1,H,0,'r'),wz(1,H,1,'r')),
+  st('Stand a square at the front.',wx(2,H,0,'r')),
+  st('Lean two squares together for the roof.',sq([1,H+1,0],X,[0,h,.5],'g'),sq([1,H+1,1],X,[0,h,-.5],'g')),
+  st('Close the roof with two triangles.',eq([1,H+1,0],Z,Y,'g'),eq([2,H+1,0],Z,Y,'g')),
+  st('Two triangles start the nose.',n[0],n[2]),
+  st('Two more triangles finish the nose.',n[1],n[3])];})()},
+
+{id:'bus',name:'Bus',emoji:'🚌',size:'medium',steps:[
+  st('Put the wheel base on the floor.',wheel(0,0,'r')),
+  st('Stand two squares along the back side.',wz(0,H,0,'y'),wz(1,H,0,'y')),
+  st('Stand two squares along the front side.',wz(0,H,1,'y'),wz(1,H,1,'y')),
+  st('Close both ends with squares.',wx(0,H,0,'o'),wx(2,H,0,'o')),
+  st('Put two squares on top of the back side.',wz(0,H+1,0,'t'),wz(1,H+1,0,'t')),
+  st('Put two squares on top of the front side.',wz(0,H+1,1,'t'),wz(1,H+1,1,'t')),
+  st('Close both ends again.',wx(0,H+1,0,'b'),wx(2,H+1,0,'b')),
+  st('Two flat squares make the roof.',fl(0,H+2,0,'r'),fl(1,H+2,0,'r'))]},
+
+{id:'elephant',name:'Elephant',emoji:'🐘',kind:'animal',size:'medium',steps:[
+  ...beast('b','b','t'),
+  st('Lean a tall triangle down at the front for the trunk.',iso([3,1,0],Z,DOWN_FRONT,'p')),
+  st('A corner triangle on each side makes big ears.',rt([3,2,0],NZ,NY,'k'),rt([3,2,1],Z,NY,'k')),
+  st('One triangle at the back makes the tail.',eq([0,2,0],Z,Y,'p'))]},
+
 {id:'helicopter',name:'Helicopter',emoji:'🚁',size:'medium',steps:(()=>{const n=nose(1,0,0,['y','o','y','o']);return[
   st('Put a square flat on the floor.',fl(0,0,0,'b')),
   st('Make a corner with two squares.',wz(0,0,0,'t'),wx(0,0,0,'b')),
@@ -461,45 +525,25 @@ const MODELS = [
   st('Put a square on top.',fl(0,1,0,'b')),
   st('Two triangles start the nose.',n[0],n[2]),
   st('Two more triangles finish the nose.',n[1],n[3]),
-  st('A flat square at the back makes the tail.',fl(-1,1,0,'r')),
-  st('Stand a corner triangle on the tail.',rt([-1,1,0],X,Y,'y')),
-  st('Two flat tall triangles make the spinning blades.',iso([0,1,0],X,NZ,'p'),iso([0,1,1],X,Z,'p'))];})()},
-
-{id:'crocodile',name:'Crocodile',emoji:'🐊',kind:'animal',size:'medium',steps:(()=>{const n=nose(3,0,0,['g','y','g','y']);return[
-  st('Stand three squares in a row.',wz(0,0,0,'g'),wz(1,0,0,'g'),wz(2,0,0,'g')),
-  st('Stand three more squares across from them.',wz(0,0,1,'g'),wz(1,0,1,'g'),wz(2,0,1,'g')),
-  st('Put three squares on top.',fl(0,1,0,'y'),fl(1,1,0,'g'),fl(2,1,0,'y')),
-  st('Two triangles start the snout.',n[0],n[2]),
-  st('Two more triangles finish the snout.',n[1],n[3]),
-  st('Two triangles on top make the eyes.',eq([2,1,0],X,Y,'r'),eq([2,1,1],X,Y,'r')),
-  st('Lean a tall triangle down for the tail.',iso([0,1,0],Z,DOWN_BACK,'g'))];})()},
-
-{id:'elephant',name:'Elephant',emoji:'🐘',kind:'animal',size:'medium',steps:[
-  st('Stand two squares up for legs.',wx(0,0,0,'b'),wx(2,0,0,'b')),
-  st('Lay two squares on top like a bridge.',fl(0,1,0,'t'),fl(1,1,0,'t')),
-  st('Stand two squares along the back side.',wz(0,1,0,'b'),wz(1,1,0,'b')),
-  st('Stand two squares along the front side.',wz(0,1,1,'b'),wz(1,1,1,'b')),
-  st('Put two squares on top.',fl(0,2,0,'t'),fl(1,2,0,'t')),
-  st('Stand a square at the front for the face.',wx(2,1,0,'t')),
-  st('A square on each side makes big ears.',wx(2,1,-1,'k'),wx(2,1,1,'k')),
-  st('Lean a tall triangle down for the trunk.',iso([2,1,0],Z,DOWN_FRONT,'p')),
-  st('One triangle makes the tail.',eq([0,2,0],Z,NX,'p'))]},
+  st('Lean a tall triangle down at the back for the tail.',iso([0,1,0],Z,DOWN_BACK,'r')),
+  st('Lay two tall triangles flat on the roof. They are the spinning blades!',
+     flat(iso([.5-IH/3,1.03,0],Z,X,'p')),flat(iso([.5+IH/3,1.06,0],Z,NX,'k')))];})()},
 
 {id:'truck',name:'Truck',emoji:'🚚',size:'medium',steps:[
-  st('Put two wheels in a row.',wheel(0,0,'b'),wheel(1,0,'b')),
-  st('Make a box on the back wheels.',box(0,H,'o','y')),
+  st('Put the wheel base on the floor.',wheel(0,0,'b')),
+  st('Make a box on the back half.',box(0,H,'o','y')),
   st('Make the box taller.',box(0,H+1,'o','y')),
   st('Put a square on top of the box.',fl(0,H+2,0,'r')),
-  st('Stand a square on each side of the front wheels.',wz(1,H,0,'b'),wz(1,H,1,'b')),
-  st('Stand a square at the front.',wx(2,H,0,'t')),
+  st('Stand a square on each side at the front.',wz(1,H,0,'b'),wz(1,H,1,'b')),
+  st('Stand a square at the very front.',wx(2,H,0,'t')),
   st('Put a square on top for the roof.',fl(1,H+1,0,'r'))]},
 
 {id:'whale',name:'Whale',emoji:'🐳',kind:'animal',size:'medium',steps:(()=>{const n=nose(2,0,0,['b','t','b','t']);return[
   st('Put two squares flat in a row.',fl(0,0,0,'b'),fl(1,0,0,'b')),
   st('Stand two squares along the back side.',wz(0,0,0,'b'),wz(1,0,0,'b')),
   st('Stand two squares along the front side.',wz(0,0,1,'b'),wz(1,0,1,'b')),
-  st('Put two squares on top.',fl(0,1,0,'t'),fl(1,1,0,'t')),
   st('Close the back with a square.',wx(0,0,0,'t')),
+  st('Put two squares on top.',fl(0,1,0,'t'),fl(1,1,0,'t')),
   st('Two triangles start the head.',n[0],n[2]),
   st('Two more triangles finish the head.',n[1],n[3]),
   st('Two corner triangles make the tail.',rt([0,0,0],NX,Y,'p'),rt([0,0,1],NX,Y,'p')),
@@ -510,69 +554,78 @@ const MODELS = [
   st('Put three squares flat in a row.',fl(0,0,0,'b'),fl(1,0,0,'b'),fl(2,0,0,'b')),
   st('Stand three squares along the back side.',wz(0,0,0,'t'),wz(1,0,0,'t'),wz(2,0,0,'t')),
   st('Stand three squares along the front side.',wz(0,0,1,'t'),wz(1,0,1,'t'),wz(2,0,1,'t')),
-  st('Put three squares on top.',fl(0,1,0,'b'),fl(1,1,0,'b'),fl(2,1,0,'b')),
   st('Close the back with a square.',wx(0,0,0,'t')),
+  st('Put three squares on top.',fl(0,1,0,'b'),fl(1,1,0,'b'),fl(2,1,0,'b')),
   st('Two triangles start the nose.',n[0],n[2]),
   st('Two more triangles finish the nose.',n[1],n[3]),
-  st('Add a flat square on each side for wings.',fl(1,1,-1,'y'),fl(1,1,1,'y')),
-  st('Corner triangles make the wing tips.',rt([2,1,-1],NX,NZ,'o'),rt([2,1,2],NX,Z,'o')),
+  st('Lay a square flat on the floor on each side for wings.',fl(1,0,-1,'y'),fl(1,0,1,'y')),
+  st('Flat corner triangles make the wing tips.',rt([2,0,-1],NX,NZ,'o'),rt([2,0,2],NX,Z,'o')),
   st('Stand two corner triangles up for the tail.',rt([0,1,0],X,Y,'r'),rt([0,1,1],X,Y,'r')),
-  st('Two flat triangles make little tail wings.',eq([0,1,0],X,NZ,'y'),eq([0,1,1],X,Z,'y'))];})()},
-
-{id:'giraffe',kind:'animal',name:'Giraffe',emoji:'🦒',size:'large',steps:[
-  st('Stand two squares up for legs.',wx(0,0,0,'y'),wx(2,0,0,'y')),
-  st('Put a square on each leg to make them long.',wx(0,1,0,'o'),wx(2,1,0,'o')),
-  st('Lay two squares on top like a bridge.',fl(0,2,0,'y'),fl(1,2,0,'y')),
-  st('Stand two squares along the back side.',wz(0,2,0,'o'),wz(1,2,0,'y')),
-  st('Stand two squares along the front side.',wz(0,2,1,'y'),wz(1,2,1,'o')),
-  st('Close both ends with squares.',wx(0,2,0,'y'),wx(2,2,0,'y')),
-  st('Put two squares on top.',fl(0,3,0,'o'),fl(1,3,0,'y')),
-  st('Stack two squares for the long neck.',wx(2,3,0,'o'),wx(2,4,0,'y')),
-  st('Two triangles make the head and the horns.',eq([2,5,0],Z,X,'o'),eq([2,5,0],Z,Y,'r')),
-  st('One triangle makes the tail.',eq([0,3,0],Z,NX,'r'))]},
-
-{id:'castle',name:'Castle',emoji:'🏰',size:'large',steps:(()=>{
-  const s1=pyr(0,2,0,['p','k','p','k'],'iso'), s2=pyr(2,2,0,['r','o','r','o']);return[
-  st('Make a box with four squares.',box(0,0,'b','t')),
-  st('Make another box next to it. Leave a gap.',box(2,0,'b','t')),
-  st('Make the first box taller.',box(0,1,'g','y')),
-  st('Make the other box taller.',box(2,1,'g','y')),
-  st('Two squares make a bridge between them.',wz(1,1,0,'r'),wz(1,1,1,'r')),
-  st('Put a triangle on top of each bridge square.',eq([1,2,0],X,Y,'o'),eq([1,2,1],X,Y,'o')),
-  st('Four tall triangles make a pointy roof.',s1),
-  st('Four triangles make the other roof.',s2)];})()},
+  st('Two flat triangles on the floor make little tail wings.',eq([0,0,0],X,NZ,'y'),eq([0,0,1],X,Z,'y'))];})()},
 
 {id:'robot',name:'Robot',emoji:'🤖',size:'large',steps:(()=>{const t=pyr(0,3,0,['r','o','r','o']);return[
-  st('Stand two squares up for legs.',wx(0,0,0,'b'),wx(1,0,0,'b')),
+  st('Make a box with four squares for the legs.',box(0,0,'b','b')),
+  st('A flat triangle at the front makes the feet.',eq([0,0,1],X,Z,'o')),
   st('Lay a square on top.',fl(0,1,0,'t')),
-  st('Make a corner with two squares for the tummy.',wz(0,1,0,'g'),wx(0,1,0,'y')),
-  st('Two more squares close the tummy.',wx(1,1,0,'y'),wz(0,1,1,'g')),
+  st('Make a box on top for the tummy.',box(0,1,'g','y')),
   st('Lay a square on top.',fl(0,2,0,'t')),
-  st('Make a corner with two squares for the head.',wz(0,2,0,'p'),wx(0,2,0,'k')),
-  st('Two more squares close the head.',wx(1,2,0,'k'),wz(0,2,1,'p')),
+  st('Make a box on top for the head.',box(0,2,'p','k')),
   st('Two corner triangles make the arms.',rt([0,2,1],NX,NY,'r'),rt([1,2,1],X,NY,'r')),
   st('Lean two triangles together for the hat.',t[0],t[2]),
   st('Two more triangles finish the hat.',t[1],t[3])];})()},
 
-{id:'skyscraper',name:'Skyscraper',emoji:'🏙️',size:'large',steps:(()=>{const t=pyr(0,5,0,['r','o','r','o'],'iso');return[
-  st('Make a box with four squares.',box(0,0,'b','t')),
-  st('Make another box on top.',box(0,1,'g','y')),
-  st('Keep going up!',box(0,2,'o','r')),
-  st('One more box.',box(0,3,'p','k')),
-  st('And one more. So tall!',box(0,4,'b','t')),
+{id:'giraffe',kind:'animal',name:'Giraffe',emoji:'🦒',size:'large',steps:(()=>{const n=nose(3,3,0,['o','y','o','y']);return[
+  ...beast('o','y','o'),
+  st('Make a box on top at the front for the neck.',box(2,2,'y','o')),
+  st('Make the neck taller with one more box.',box(2,3,'o','y')),
+  st('Put a square on top.',fl(2,4,0,'y')),
+  st('Two triangles start the head.',n[0],n[2]),
+  st('Two more triangles finish the head.',n[1],n[3]),
+  st('Two triangles on top make the horns.',eq([2,4,0],X,Y,'r'),eq([2,4,1],X,Y,'r')),
+  st('Lean a tall triangle down at the back for the tail.',iso([0,1,0],Z,DOWN_BACK,'r'))];})()},
+
+{id:'castle',name:'Castle',emoji:'🏰',size:'large',steps:(()=>{
+  const s1=pyr(0,2,0,['p','k','p','k'],'iso'), s2=pyr(2,2,0,['r','o','r','o']);return[
+  ...podium('b','t','g'),
+  st('Make a box on top at one end.',box(0,1,'g','y')),
+  st('Make a box on top at the other end.',box(2,1,'g','y')),
+  st('Two triangles in the middle make the wall top.',eq([1,1,0],X,Y,'o'),eq([1,1,1],X,Y,'o')),
+  st('Four tall triangles make a pointy roof.',s1),
+  st('Four triangles make the other roof.',s2)];})()},
+
+{id:'skyscraper',name:'Skyscraper',emoji:'🏙️',size:'large',steps:(()=>{const t=pyr(1,4,0,['r','o','r','o'],'iso');return[
+  ...podium('b','t','y'),
+  st('Make a box on top in the middle.',box(1,1,'g','y')),
+  st('Lay a square on it.',fl(1,2,0,'y')),
+  st('Make another box.',box(1,2,'o','r')),
+  st('Lay a square on it.',fl(1,3,0,'y')),
+  st('One more box. So tall!',box(1,3,'p','k')),
   st('Lean two tall triangles together on top.',t[0],t[2]),
   st('Two more tall triangles finish the roof.',t[1],t[3])];})()},
+
+{id:'caterpillar',name:'Caterpillar',emoji:'🐛',kind:'animal',size:'large',steps:[
+  st('Put three squares flat in a row.',fl(0,0,0,'g'),fl(1,0,0,'y'),fl(2,0,0,'g')),
+  st('Stand three squares along the back side.',wz(0,0,0,'g'),wz(1,0,0,'y'),wz(2,0,0,'g')),
+  st('Stand three squares along the front side.',wz(0,0,1,'g'),wz(1,0,1,'y'),wz(2,0,1,'g')),
+  st('Close both ends with squares.',wx(0,0,0,'y'),wx(3,0,0,'y')),
+  st('Put three squares on top.',fl(0,1,0,'y'),fl(1,1,0,'g'),fl(2,1,0,'y')),
+  st('Make a box on top at the front for the head.',box(2,1,'o','r')),
+  st('Put a square on top of the head.',fl(2,2,0,'o')),
+  st('Two triangles make the feelers.',eq([2,2,0],X,Y,'p'),eq([2,2,1],X,Y,'p')),
+  st('Triangles on the back make humps.',eq([0,1,0],X,Y,'p'),eq([1,1,0],X,Y,'p')),
+  st('One triangle at the back makes the tail.',eq([0,1,0],Z,Y,'r'))]},
 
 {id:'church',name:'Church',emoji:'⛪',size:'large',steps:(()=>{const t=pyr(2,2,0,['p','k','p','k'],'iso');return[
   st('Stand two squares in a row.',wz(0,0,0,'y'),wz(1,0,0,'y')),
   st('Stand two more squares across from them.',wz(0,0,1,'y'),wz(1,0,1,'y')),
   st('Close both ends with squares.',wx(0,0,0,'o'),wx(2,0,0,'o')),
+  st('Three squares make a tower at the front.',wz(2,0,0,'b'),wx(3,0,0,'t'),wz(2,0,1,'b')),
+  st('Lay a square on the tower.',fl(2,1,0,'t')),
+  st('Make a box on top of the tower.',box(2,1,'b','t')),
   st('Lean two squares together for the roof.',sq([0,1,0],X,[0,h,.5],'r'),sq([0,1,1],X,[0,h,-.5],'r')),
   st('Lean two more squares together.',sq([1,1,0],X,[0,h,.5],'r'),sq([1,1,1],X,[0,h,-.5],'r')),
   st('Close the roof with a triangle.',eq([0,1,0],Z,Y,'o')),
-  st('Three squares make a tower at the front.',wz(2,0,0,'b'),wx(3,0,0,'t'),wz(2,0,1,'b')),
-  st('Make a box on top of the tower.',box(2,1,'b','t')),
-  st('Lean two tall triangles together on top.',t[0],t[2]),
+  st('Lean two tall triangles together on the tower.',t[0],t[2]),
   st('Two more tall triangles finish the tower.',t[1],t[3])];})()},
 
 {id:'pirate',name:'Pirate Ship',emoji:'⚓',size:'large',steps:[
@@ -582,11 +635,21 @@ const MODELS = [
   st('Stand three squares along the front side.',wz(0,0,1,'o'),wz(1,0,1,'o'),wz(2,0,1,'o')),
   st('Stand a square at the end.',wx(0,0,0,'r')),
   st('Two squares make the pointy front.',sq([3,0,0],[h,0,.5],Y,'r'),sq([3,0,1],[h,0,-.5],Y,'r')),
-  st('Make a corner on top for the cabin.',wz(0,1,0,'p'),wx(0,1,0,'k')),
-  st('Two more squares close the cabin.',wx(1,1,0,'k'),wz(0,1,1,'p')),
+  st('Put three squares on top for the deck.',fl(0,1,0,'b'),fl(1,1,0,'b'),fl(2,1,0,'b')),
+  st('Make a box on the deck at the back for the cabin.',box(0,1,'p','k')),
   st('Put a square on top of the cabin.',fl(0,2,0,'r')),
-  st('Stand two tall triangles up for sails.',iso([2,0,0],Z,Y,'y'),iso([3,0,0],Z,Y,'y')),
-  st('A triangle on top makes the flag.',eq([0,2,0],Z,Y,'g'))]},
+  st('Four tall triangles make a sail.',pyr(1,1,0,['y','t','y','t'],'iso')),
+  st('Four more tall triangles make another sail.',pyr(2,1,0,['y','t','y','t'],'iso')),
+  st('A triangle on the cabin makes the flag.',eq([0,2,0],Z,Y,'g'))]},
+
+{id:'dinosaur',name:'Dinosaur',emoji:'🦕',kind:'animal',size:'large',steps:(()=>{const n=nose(3,2,0,['g','y','g','y']);return[
+  ...beast('g','g','t'),
+  st('Make a box on top at the front for the neck.',box(2,2,'t','g')),
+  st('Put a square on top.',fl(2,3,0,'g')),
+  st('Two triangles start the head.',n[0],n[2]),
+  st('Two more triangles finish the head.',n[1],n[3]),
+  st('Two triangles make spikes on the back.',eq([0,2,0],Z,Y,'o'),eq([1,2,0],Z,Y,'o')),
+  st('Lean a tall triangle down at the back for the tail.',iso([0,1,0],Z,DOWN_BACK,'p'))];})()},
 
 {id:'submarine',name:'Submarine',emoji:'🤿',size:'large',steps:(()=>{
   const n=nose(3,0,0,['o','r','o','r']), b=nose(0,0,0,['o','r','o','r'],-1);return[
@@ -602,50 +665,25 @@ const MODELS = [
   st('Put a square on top of the box.',fl(1,2,0,'b')),
   st('A corner triangle makes the periscope.',rt([1,2,0],X,Y,'r'))];})()},
 
-{id:'dinosaur',name:'Dinosaur',emoji:'🦕',kind:'animal',size:'large',steps:(()=>{const n=nose(3,1,0,['g','y','g','y']);return[
-  st('Stand two squares up for legs, far apart.',wx(0,0,0,'g'),wx(3,0,0,'g')),
-  st('Lay three squares on top like a bridge.',fl(0,1,0,'t'),fl(1,1,0,'t'),fl(2,1,0,'t')),
-  st('Stand three squares along the back side.',wz(0,1,0,'g'),wz(1,1,0,'t'),wz(2,1,0,'g')),
-  st('Stand three squares along the front side.',wz(0,1,1,'g'),wz(1,1,1,'t'),wz(2,1,1,'g')),
-  st('Put three squares on top.',fl(0,2,0,'g'),fl(1,2,0,'g'),fl(2,2,0,'g')),
-  st('Close the back with a square.',wx(0,1,0,'t')),
-  st('Two triangles start the head.',n[0],n[2]),
-  st('Two more triangles finish the head.',n[1],n[3]),
-  st('Two triangles make spikes on the back.',eq([1,2,0],Z,Y,'o'),eq([2,2,0],Z,Y,'o')),
-  st('Lean a tall triangle down for the tail.',iso([0,1,0],Z,DOWN_BACK,'p'))];})()},
-
-{id:'caterpillar',name:'Caterpillar',emoji:'🐛',kind:'animal',size:'large',steps:[
-  st('Stand three squares in a row.',wz(0,0,0,'g'),wz(1,0,0,'y'),wz(2,0,0,'g')),
-  st('Stand three more squares across from them.',wz(0,0,1,'g'),wz(1,0,1,'y'),wz(2,0,1,'g')),
-  st('Close both ends with squares.',wx(0,0,0,'y'),wx(3,0,0,'y')),
-  st('Put two squares on top.',fl(0,1,0,'y'),fl(1,1,0,'g')),
-  st('Make a corner on top for the head.',wz(2,1,0,'o'),wx(2,1,0,'r')),
-  st('Two more squares close the head.',wx(3,1,0,'r'),wz(2,1,1,'o')),
-  st('Put a square on top of the head.',fl(2,2,0,'o')),
-  st('Two triangles make the feelers.',eq([2,2,0],X,Y,'p'),eq([2,2,1],X,Y,'p')),
-  st('One triangle makes the tail.',eq([0,1,0],Z,NX,'p'))]},
-
 {id:'factory',name:'Factory',emoji:'🏭',size:'large',steps:[
   st('Stand two squares in a row.',wz(0,0,0,'o'),wz(1,0,0,'o')),
   st('Stand two more squares across from them.',wz(0,0,1,'o'),wz(1,0,1,'o')),
   st('Close both ends with squares.',wx(0,0,0,'y'),wx(2,0,0,'y')),
   st('Put two squares on top for the roof.',fl(0,1,0,'b'),fl(1,1,0,'b')),
   st('Make a box on the roof for the chimney.',box(0,1,'r','k')),
+  st('Lay a square on the chimney.',fl(0,2,0,'b')),
   st('Make the chimney taller.',box(0,2,'r','k')),
   st('Two corner triangles finish the roof.',rt([1,1,0],X,Y,'t'),rt([1,1,1],X,Y,'t'))]},
 
-{id:'unicorn',name:'Unicorn',emoji:'🦄',kind:'animal',size:'large',steps:(()=>{const n=nose(2,2,0,['k','p','k','p']);return[
-  st('Stand two squares up for legs.',wx(0,0,0,'k'),wx(2,0,0,'k')),
-  st('Lay two squares on top like a bridge.',fl(0,1,0,'p'),fl(1,1,0,'p')),
-  st('Stand two squares along the back side.',wz(0,1,0,'t'),wz(1,1,0,'k')),
-  st('Stand two squares along the front side.',wz(0,1,1,'t'),wz(1,1,1,'k')),
-  st('Put two squares on top.',fl(0,2,0,'p'),fl(1,2,0,'p')),
-  st('Close both ends with squares.',wx(0,1,0,'t'),wx(2,1,0,'t')),
-  st('Stand a square on top for the neck.',wx(2,2,0,'k')),
+{id:'unicorn',name:'Unicorn',emoji:'🦄',kind:'animal',size:'large',steps:(()=>{const n=nose(3,2,0,['k','p','k','p']);return[
+  ...beast('k','k','p'),
+  st('Make a box on top at the front for the neck.',box(2,2,'t','k')),
+  st('Put a square on top.',fl(2,3,0,'p')),
   st('Two triangles start the head.',n[0],n[2]),
   st('Two more triangles finish the head.',n[1],n[3]),
-  st('A tall triangle on top makes the horn.',iso([2,3,0],Z,Y,'y')),
-  st('Lean a tall triangle down for the tail.',iso([0,1,0],Z,DOWN_BACK,'b'))];})()}
+  st('A tall triangle on top makes the horn.',iso([3,3,0],Z,Y,'y')),
+  st('A triangle behind the horn makes the mane.',eq([2,3,0],Z,Y,'b')),
+  st('Lean a tall triangle down at the back for the tail.',iso([0,1,0],Z,DOWN_BACK,'b'))];})()}
 ];
 
 /* The order builds appear in. Every row of three is one group: two things and one animal.
@@ -773,7 +811,7 @@ function icon(s,c){
     siso:`<polygon points="32,14 48,56 16,56" ${a}/><polygon points="32,30 40,50 24,50" ${b}/>`,
     rect:`<rect x="19" y="6" width="26" height="52" rx="4" ${a}/><rect x="25" y="13" width="14" height="38" rx="2" ${b}/>`,
     bsq:`<rect x="5" y="5" width="54" height="54" rx="4" ${a}/><path d="M32 9V55M9 32H55" ${b}/>`,
-    wh:`<rect x="8" y="16" width="48" height="22" rx="5" ${a}/><circle cx="19" cy="45" r="10" fill="#2b2f3a"/><circle cx="45" cy="45" r="10" fill="#2b2f3a"/><circle cx="19" cy="45" r="4" fill="#d9dde6"/><circle cx="45" cy="45" r="4" fill="#d9dde6"/>`
+    wh:`<rect x="4" y="18" width="56" height="20" rx="4" ${a}/><path d="M32 18V38" stroke="#fff" stroke-opacity=".85" stroke-width="3"/><circle cx="15" cy="46" r="9" fill="#2b2f3a"/><circle cx="49" cy="46" r="9" fill="#2b2f3a"/><circle cx="15" cy="46" r="3.5" fill="#d9dde6"/><circle cx="49" cy="46" r="3.5" fill="#d9dde6"/>`
   }[s];
   return `<svg viewBox="0 0 64 64" aria-hidden="true">${body}</svg>`;
 }
@@ -819,7 +857,7 @@ paintMute();
    App state + screens
    ============================================================ */
 const $=id=>document.getElementById(id);
-const inv=Object.assign({},...SHAPES.map(s=>({[s.id]:s.def})),store.get('inv2',{}));
+const inv=Object.assign({},...SHAPES.map(s=>({[s.id]:s.def})),store.get('inv3',null)||Object.assign(store.get('inv2',{}),{wh:1}));
 let screen='inv', size='small', model=null, stepI=0, animT=null, spin=0, previews=[];
 
 function show(id){
@@ -827,10 +865,10 @@ function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
 }
 document.querySelectorAll('.back').forEach(b=>b.onclick=()=>{click();show(b.dataset.to);if(b.dataset.to==='pick')buildPick();});
-let finished=new Set(store.get('done',[])), openAll=store.get('all',false);
+let finished=new Set(store.get('done',[])), lockOn=store.get('lock',false);
 // how many builds of this size can be played right now
 function unlocked(sz){
-  const ids=ORDER[sz]; if(openAll) return ids.length;
+  const ids=ORDER[sz]; if(!lockOn) return ids.length;
   let g=0; while((g+1)*GROUP<=ids.length && ids.slice(g*GROUP,(g+1)*GROUP).every(id=>finished.has(id))) g++;
   return Math.min(ids.length,(g+1)*GROUP);
 }
@@ -846,7 +884,7 @@ function buildInv(){
     let timer=null, rep=null;
     const bump=()=>{
       const k=b.dataset.s, v=Math.max(0,Math.min(99,inv[k]+ +b.dataset.d));
-      if(v===inv[k]) return; inv[k]=v; store.set('inv2',inv);
+      if(v===inv[k]) return; inv[k]=v; store.set('inv3',inv);
       const el=$('cnt_'+k); el.textContent=v; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); click();
     };
     const stop=()=>{clearTimeout(timer);clearInterval(rep);timer=rep=null;};
@@ -867,7 +905,6 @@ $('sizes').querySelectorAll('.sizebtn').forEach(b=>b.onclick=()=>{click();size=b
 /* ---- 3. pick ---- */
 function buildPick(){
   const list=ORDER[size].map(id=>MODELS.find(m=>m.id===id)), open=unlocked(size);
-  $('pickTitle').textContent=(openAll?'🔓 ':'')+'Pick one!';
   $('grid').innerHTML=list.map((m,i)=>{
     const ms=missing(m), lock=i>=open;
     return `<button class="card ${lock?'locked':''}" data-id="${m.id}" aria-label="${m.name}${lock?' (locked)':''}">
@@ -888,12 +925,8 @@ function buildPick(){
     };
   });
 }
-// grown-ups: hold the title for two seconds to open (or re-lock) every build
-(()=>{let t=null;const el=$('pickTitle');
-  const stop=()=>{clearTimeout(t);t=null;};
-  el.addEventListener('pointerdown',()=>{stop();t=setTimeout(()=>{openAll=!openAll;store.set('all',openAll);click();buildPick();},2000);});
-  ['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,stop));
-})();
+$('lockSw').checked=lockOn;
+$('lockSw').onchange=e=>{lockOn=e.target.checked;store.set('lock',lockOn);click();};
 
 /* ---- 4. tiles needed ---- */
 function buildNeed(){
@@ -1024,21 +1057,49 @@ function tick(now){
    Self-check (run validateModels() in the console)
    ============================================================ */
 window.validateModels=function(){
-  const want={sq:[1,1,1,1],wh:[1,1,1,1],eq:[1,1,1],rt:[1,1,Math.SQRT2],iso:[1,2,2]}, errs=[];
+  const want={sq:[1,1,1,1],wh:[1,1,2,2],eq:[1,1,1],rt:[1,1,Math.SQRT2],iso:[1,2,2]}, errs=[], notes=[];
+  const E=1e-6, sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],
+    cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], len=a=>Math.hypot(...a);
+  const edges=t=>t.v.map((p,k)=>[p,t.v[(k+1)%t.v.length]]);
+  const norm=t=>{const n=cross(sub(t.v[1],t.v[0]),sub(t.v[2],t.v[0])),l=len(n);return n.map(k=>k/l);};
+  const onSeg=(p,a,b)=>{const ab=sub(b,a),ap=sub(p,a),k=dot(ap,ab)/dot(ab,ab);return k>-E&&k<1+E&&len(cross(ab,ap))<1e-4;};
+  const onBase=(p,w)=>Math.abs(p[1]-H)<E&&p[0]>w.v[0][0]-E&&p[0]<w.v[1][0]+E&&p[2]>w.v[0][2]-E&&p[2]<w.v[3][2]+E;
+  // does edge e of one tile sit along tile B?
+  const joins=(e,B)=>(B.s==='wh'&&onBase(e[0],B)&&onBase(e[1],B))||edges(B).some(f=>
+    (onSeg(e[0],f[0],f[1])&&onSeg(e[1],f[0],f[1]))||(onSeg(f[0],e[0],e[1])&&onSeg(f[1],e[0],e[1])));
+  const onFloor=e=>Math.abs(e[0][1])<E&&Math.abs(e[1][1])<E;
+  const level=t=>t.v.every(p=>Math.abs(p[1]-t.v[0][1])<E);
   MODELS.forEach(m=>{
     const seen=new Set();
     m.tiles.forEach((t,i)=>{
+      const tag=`${m.id} step ${t.step+1} (${t.s})`;
+      // --- is it a real tile shape? ---
       const e=t.v.map((p,k)=>{const q=t.v[(k+1)%t.v.length];return Math.hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2]);}).sort((a,b)=>a-b);
-      if(e.length!==want[t.s].length||e.some((x,k)=>Math.abs(x-want[t.s][k])>1e-6)) errs.push(`${m.id} tile ${i} (${t.s}) edges ${e.map(x=>x.toFixed(3))}`);
-      if(t.v.length===4){const dg=Math.hypot(t.v[0][0]-t.v[2][0],t.v[0][1]-t.v[2][1],t.v[0][2]-t.v[2][2]);
-        if(Math.abs(dg-Math.SQRT2)>1e-6) errs.push(`${m.id} tile ${i} not square`);}
+      if(e.length!==want[t.s].length||e.some((x,k)=>Math.abs(x-want[t.s][k])>1e-6)) errs.push(`${tag} edges ${e.map(x=>x.toFixed(3))}`);
+      if(t.s==='sq'){const dg=Math.hypot(...sub(t.v[0],t.v[2]));if(Math.abs(dg-Math.SQRT2)>1e-6) errs.push(`${tag} not square`);}
       const key=t.v.map(p=>p.map(x=>x.toFixed(3)).join(',')).sort().join('|');
-      if(seen.has(key)) errs.push(`${m.id} tile ${i} duplicate`); seen.add(key);
-      if(!COL[t.c]) errs.push(`${m.id} tile ${i} bad colour ${t.c}`);
-      if(t.v.some(p=>p[1]<-1e-9)) errs.push(`${m.id} tile ${i} below the floor`);
+      if(seen.has(key)) errs.push(`${tag} duplicate`); seen.add(key);
+      if(!COL[t.c]) errs.push(`${tag} bad colour ${t.c}`);
+      if(t.v.some(p=>p[1]<-1e-9)) errs.push(`${tag} below the floor`);
+      if(t.v.some(p=>p[1]>6)) errs.push(`${tag} too tall`);
+      // --- will it stand up? ---
+      if(t.s==='wh'||t.rest) return;
+      const es=edges(t), others=m.tiles.filter(o=>o!==t&&!o.rest);
+      const held=es.filter(x=>onFloor(x)||others.some(o=>joins(x,o))).length;
+      const heldNow=es.some(x=>onFloor(x)||others.some(o=>o.step<=t.step&&joins(x,o)));
+      if(!heldNow) errs.push(`${tag} has nothing to hold on to when it is placed`);
+      if(level(t)){ if(t.v[0][1]>E&&held<2) errs.push(`${tag} flat tile hangs by one edge`); return; }
+      if(t.v.length===4&&held<2) errs.push(`${tag} square stands on one edge`);
+      if(t.v.length===3&&held<2) notes.push(`${m.id}: ${t.s} triangle held by one edge (step ${t.step+1})`);
+      if(t.v.length===4&&es.some(onFloor)){
+        const n=norm(t), g=es.filter(onFloor), up=es.filter(x=>!onFloor(x));
+        const onTile=others.some(o=>level(o)&&g.some(x=>joins(x,o)));
+        const corner=others.some(o=>!level(o)&&edges(o).some(onFloor)&&Math.abs(dot(norm(o),n))<.99&&up.some(x=>joins(x,o)));
+        if(!onTile&&!corner) errs.push(`${tag} wall stands alone on the floor`);
+      }
     });
   });
-  return {errors:errs,models:MODELS.map(m=>({id:m.id,size:m.size,steps:m.steps.length,tiles:m.count,need:m.need}))};
+  return {errors:errs,notes,models:MODELS.map(m=>({id:m.id,size:m.size,steps:m.steps.length,tiles:m.count,need:m.need}))};
 };
 
 buildInv();

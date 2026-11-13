@@ -28,9 +28,11 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
   box-shadow:0 4px 0 rgba(29,42,68,.18);display:grid;place-items:center}
 .round:active,.big:active,.pm:active,.sizebtn:active,.card:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(29,42,68,.18)}
 .round.ghost{visibility:hidden}
-.lockrow{flex:none;display:flex;align-items:center;gap:10px;max-width:640px;width:calc(100% - 4px);margin:0 auto 8px;background:#fff;
+.lockrow{flex:none;display:flex;align-items:center;gap:10px;max-width:640px;width:calc(100% - 4px);margin:10px auto 6px;background:#fff;
   border-radius:20px;padding:8px 14px;font-weight:900;font-size:clamp(15px,4.4vw,20px);box-shadow:0 4px 0 rgba(29,42,68,.12)}
 .lockrow span{flex:1}
+.lockrow small{display:block;font-size:.72em;font-weight:700;opacity:.6}
+.rows.fixed .pm{opacity:.25;pointer-events:none}
 .lockrow input{position:absolute;opacity:0;width:1px;height:1px}
 .lockrow i{width:66px;height:38px;border-radius:99px;background:#c5ccd8;position:relative;flex:none;transition:background .15s}
 .lockrow i::after{content:"";position:absolute;top:4px;left:4px;width:30px;height:30px;border-radius:50%;background:#fff;
@@ -170,13 +172,14 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 <!-- 1. inventory -->
 <section class="screen on" id="inv">
   <div class="bar"><span class="round ghost"></span><h1>🧲 My Tiles</h1><button class="round mute" aria-label="Sound">🔊</button></div>
-  <label class="lockrow"><span>🔒 Open builds 3 at a time</span><input type="checkbox" id="lockSw" role="switch"><i></i></label>
   <p class="sub">How many do you have?</p>
   <div class="fill">
     <div class="rows" id="rows"></div>
     <label class="namebox">✏️ <span>What is your name?</span>
       <input id="kidName" type="text" maxlength="12" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Type your name">
     </label>
+    <label class="lockrow"><span>🧩 Use my own tile counts<small id="ownHint"></small></span><input type="checkbox" id="ownSw" role="switch"><i></i></label>
+    <label class="lockrow"><span>🔒 Open builds 3 at a time</span><input type="checkbox" id="lockSw" role="switch"><i></i></label>
   </div>
   <button class="big" id="invGo" aria-label="Next">Go ▶</button>
 </section>
@@ -857,7 +860,11 @@ paintMute();
    App state + screens
    ============================================================ */
 const $=id=>document.getElementById(id);
-const inv=Object.assign({},...SHAPES.map(s=>({[s.id]:s.def})),store.get('inv3',null)||Object.assign(store.get('inv2',{}),{wh:1}));
+// two sets of counts: the default set, and the child's own set which is remembered
+const DEFAULTS=Object.assign({},...SHAPES.map(s=>({[s.id]:s.def})));
+const own=Object.assign({},DEFAULTS,store.get('inv3',null)||Object.assign(store.get('inv2',{}),{wh:1}));
+let useOwn=store.get('own',false);
+const inv=Object.assign({},useOwn?own:DEFAULTS);
 let screen='inv', size='small', model=null, stepI=0, animT=null, spin=0, previews=[];
 
 function show(id){
@@ -884,7 +891,7 @@ function buildInv(){
     let timer=null, rep=null;
     const bump=()=>{
       const k=b.dataset.s, v=Math.max(0,Math.min(99,inv[k]+ +b.dataset.d));
-      if(v===inv[k]) return; inv[k]=v; store.set('inv3',inv);
+      if(!useOwn||v===inv[k]) return; inv[k]=own[k]=v; store.set('inv3',own);
       const el=$('cnt_'+k); el.textContent=v; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); click();
     };
     const stop=()=>{clearTimeout(timer);clearInterval(rep);timer=rep=null;};
@@ -925,6 +932,14 @@ function buildPick(){
     };
   });
 }
+function paintOwn(){
+  Object.assign(inv,useOwn?own:DEFAULTS);
+  SHAPES.forEach(s=>{const el=$('cnt_'+s.id); if(el) el.textContent=inv[s.id];});
+  $('rows').classList.toggle('fixed',!useOwn);
+  $('ownSw').checked=useOwn;
+  $('ownHint').textContent=useOwn?'On: your saved counts. Change them with − and +.':'Off: the default tile set.';
+}
+$('ownSw').onchange=e=>{useOwn=e.target.checked;store.set('own',useOwn);click();paintOwn();};
 $('lockSw').checked=lockOn;
 $('lockSw').onchange=e=>{lockOn=e.target.checked;store.set('lock',lockOn);click();};
 
@@ -1103,6 +1118,7 @@ window.validateModels=function(){
 };
 
 buildInv();
+paintOwn();
 requestAnimationFrame(tick);
 </script>
 </body>

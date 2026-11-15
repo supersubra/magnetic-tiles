@@ -80,6 +80,9 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
   box-shadow:0 5px 0 rgba(29,42,68,.14);display:block;width:100%}
 .card canvas{width:100%;aspect-ratio:1/1;display:block;border-radius:20px;background:linear-gradient(#e6f6ff,#f6fff0)}
 .card .nm{font-size:clamp(18px,5vw,26px);font-weight:900;margin-top:4px}
+.sn{display:inline-block;font-weight:900;font-size:.7em;color:#555;background:#eef3f7;border-radius:8px;padding:0 6px;vertical-align:middle;margin-right:2px}
+.pic{position:relative}
+.pic .sn{position:absolute;top:6px;left:6px;z-index:2;font-size:18px;background:rgba(255,255,255,.9);color:#222;box-shadow:0 2px 0 rgba(0,0,0,.2)}
 .card .badge{position:absolute;top:12px;right:12px;width:38px;height:38px;border-radius:50%;background:var(--g);color:#fff;
   font-size:22px;font-weight:900;display:grid;place-items:center;box-shadow:0 3px 0 rgba(0,0,0,.18)}
 .card.locked canvas{opacity:.35;filter:grayscale(1)}
@@ -738,6 +741,10 @@ const ORDER = {
 };
 const GROUP = 3;
 
+/* Serial number for every build (#1 to #39), in the order they appear on screen:
+   small 1–12, medium 13–26, big 27–39. Use these numbers to ask for a change. */
+{let n=0; ['small','medium','large'].forEach(sz=>ORDER[sz].forEach(id=>{MODELS.find(m=>m.id===id).no=++n;}));}
+
 /* pre-compute everything the renderer needs */
 function prep(m){
   m.tiles=[]; m.need={sq:0,eq:0,rt:0,iso:0,wh:0};
@@ -956,7 +963,7 @@ function buildPick(){
     const ms=missing(m), lock=i>=open;
     return `<button class="card ${lock?'locked':''}" data-id="${m.id}" aria-label="${m.name}${lock?' (locked)':''}">
       <canvas></canvas><div class="badge">${lock?'✕':'✓'}</div>${finished.has(m.id)?'<div class="star">⭐</div>':''}
-      <div class="nm">${m.emoji} ${m.name}</div>
+      <div class="nm"><span class="sn">#${m.no}</span> ${m.emoji} ${m.name}</div>
       <div class="miss">${lock?'':ms.map(x=>`<span>+${x.n}${icon(x.s.id,x.s.col)}</span>`).join('')}</div></button>`;
   }).join('');
   previews=[];
@@ -985,7 +992,7 @@ $('lockSw').onchange=e=>{lockOn=e.target.checked;store.set('lock',lockOn);click(
 
 /* ---- 4. tiles needed ---- */
 function buildNeed(){
-  $('needTitle').textContent=model.emoji+' '+model.name;
+  $('needTitle').textContent='#'+model.no+' '+model.emoji+' '+model.name;
   $('needList').innerHTML=SHAPES.filter(s=>model.need[s.id]).map(s=>{
     const n=model.need[s.id], lack=Math.max(0,n-have(s.id));
     return `<div class="need ${lack?'bad':''}">${icon(s.id,s.col)}<b>× ${n}</b><i>${lack?'⚠️':'✅'}</i>${lack?`<small>${lack} more</small>`:''}</div>`;
@@ -1044,7 +1051,7 @@ function finish(){
   const opened=unlocked(model.size)>before;
   show('done'); doneT=performance.now();
   // the real thing, next to the tile model. A photo at images/<id>.jpg is used when there is one.
-  $('donePic').innerHTML=`<span>${model.emoji}</span><img alt="${model.name}" src="images/${model.id}.jpg" onerror="this.remove()">`;
+  $('donePic').innerHTML=`<b class="sn">#${model.no}</b><span>${model.emoji}</span><img alt="${model.name}" src="images/${model.id}.jpg" onerror="this.remove()">`;
   // a different cheer every time, in turn
   const turn=store.get('cheer',0), [cheer,extra]=CHEERS[turn%CHEERS.length]; store.set('cheer',turn+1);
   const esc=t=>t.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

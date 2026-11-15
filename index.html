@@ -338,8 +338,9 @@ const beast=(leg,a,b)=>[
   st('Stand three squares along the front side.',wz(0,1,1,a),wz(1,1,1,b),wz(2,1,1,a)),
   st('Close both ends with squares.',wx(0,1,0,b),wx(3,1,0,b)),
   st('Put three squares on top.',fl(0,2,0,a),fl(1,2,0,a),fl(2,2,0,a))];
-// a rectangle is one tile wide and two tiles long: u is the short side, v the long side
+// a rectangle is one tile long and half a tile wide (a square folded in half): u is the short side, v the long side
 const rc=(o,u,v,c)=>({s:'rect',c,v:[o,add(o,u),add(add(o,u),v),add(o,v)]});
+const ZH=[0,0,.5];                                    // the half-tile width of a rectangle
 const R3=Math.sqrt(3), SLOPE=[R3,-1,0];              // a rectangle sloping down one tile high
 const SD=[R3/2,-.5,0], SN=[.5,R3/2,0];               // along that slope, and straight up from it
 const flat=t=>Object.assign(t,{rest:true});   // a tile that just lies on top of another
@@ -565,19 +566,19 @@ const MODELS = [
   st('Stand two more squares across from them.',wz(0,0,1,'b'),wz(1,0,1,'b')),
   st('Close both ends. Put one wall inside.',wx(0,0,0,'t'),wx(1,0,0,'t'),wx(2,0,0,'t')),
   st('Put two squares on top.',fl(0,1,0,'y'),fl(1,1,0,'y')),
-  st('Lean a rectangle from the top down to the floor. That is the ramp!',rc([2,1,0],Z,SLOPE,'r')),
-  st('Lay a rectangle flat at the bottom for the road.',rc([2+R3,0,0],Z,[2,0,0],'o')),
+  st('Lean two rectangles from the top edge down. Side by side, that is the ramp!',rc([2,1,0],ZH,SD,'r'),rc([2,1,.5],ZH,SD,'r')),
+  st('Lean two more rectangles from the middle down to the floor.',rc(add([2,1,0],SD),ZH,SD,'r'),rc(add([2,1,.5],SD),ZH,SD,'r')),
   st('Triangles on top stop the car falling off.',eq([0,1,0],X,Y,'g'),eq([0,1,1],X,Y,'g'),eq([0,1,0],Z,Y,'g')),
   st('Put the wheel base on top. Let it roll down!',wheel(0,0,'p',1))]},
 
 {id:'track',name:'Train Track',emoji:'🛤️',size:'medium',steps:(()=>{const t=pyr(1,1,0,['r','o','r','o']);return[
-  st('Lay two rectangles flat in a line.',rc([0,0,0],Z,[2,0,0],'b'),rc([2,0,0],Z,[2,0,0],'t')),
-  st('Lay a square flat at each end, going sideways.',fl(0,0,1,'y'),fl(3,0,1,'y')),
-  st('Lay two more rectangles to close the loop.',rc([0,0,2],Z,[2,0,0],'t'),rc([2,0,2],Z,[2,0,0],'b')),
+  st('Lay two rectangles flat in a line for the track.',rc([0,0,0],ZH,X,'b'),rc([1,0,0],ZH,X,'t')),
+  st('Lay two more rectangles to carry the track on.',rc([2,0,0],ZH,X,'b'),rc([3,0,0],ZH,X,'t')),
+  st('Lay a square flat beside the track, for the tunnel to stand on.',fl(1,0,1,'y')),
   st('Stand a square on each side of the track for a tunnel.',wz(1,0,0,'g'),wz(1,0,1,'g')),
   st('Put a square on top of the tunnel.',fl(1,1,0,'g')),
   st('Four triangles make the tunnel roof.',t),
-  st('Put the wheel base on the track. Choo choo!',wheel(1,2,'r'))];})()},
+  st('Put the wheel base on the track. Choo choo!',wheel(1,0,'r'))];})()},
 
 /* ---------- large ---------- */
 {id:'airplane',name:'Airplane',emoji:'✈️',size:'large',steps:(()=>{const n=nose(3,0,0,['r','o','r','o']);return[
@@ -716,7 +717,8 @@ const MODELS = [
   st('Lean a tall triangle down at the back for the tail.',iso([0,1,0],Z,DOWN_BACK,'b'))];})()},
 {id:'marble',name:'Marble Run',emoji:'🔮',size:'large',steps:(()=>{
   const A=1+R3, B=2+R3, C=2+2*R3;
-  const rails=(x,y,c)=>[0,1].flatMap(z=>[0,1].map(k=>eq(add([x,y,z],mul(SD,k)),SD,SN,c)));
+  // two rails either side of a slide (one rectangle wide, two rectangles long): a triangle for each half-length
+  const rails=(x,y,c)=>[0,.5].flatMap(z=>[0,1].map(k=>eq(add([x,y,z],mul(SD,k)),SD,SN,c)));
   return[
   st('Make a box with four squares.',box(0,0,'b','t')),
   st('Lay a square on top.',fl(0,1,0,'y')),
@@ -724,8 +726,8 @@ const MODELS = [
   st('Lay a square on top. This is where the marble starts.',fl(0,2,0,'y')),
   st('Three triangles on top keep the marble in.',eq([0,2,0],X,Y,'r'),eq([0,2,1],X,Y,'r'),eq([0,2,0],Z,Y,'r')),
   st('Make a small box a little way off. Put a square on top.',box(A,0,'g','y'),fl(A,1,0,'y')),
-  st('Lean a rectangle from the tall tower down to the small box.',rc([1,2,0],Z,SLOPE,'o')),
-  st('Lean another rectangle from the small box down to the floor.',rc([B,1,0],Z,SLOPE,'o')),
+  st('Lean two rectangles from the tall tower down to the small box. That is the first slide!',rc([1,2,0],ZH,SD,'o'),rc(add([1,2,0],SD),ZH,SD,'o')),
+  st('Lean two more rectangles from the small box down to the floor. That is the second slide!',rc([B,1,0],ZH,SD,'o'),rc(add([B,1,0],SD),ZH,SD,'o')),
   st('Stand four triangles along the first slide for walls.',rails(1,2,'p')),
   st('Stand four triangles along the second slide.',rails(B,1,'k')),
   st('Lay a square flat at the bottom.',fl(C,0,0,'b')),
@@ -1119,7 +1121,7 @@ function tick(now){
    Self-check (run validateModels() in the console)
    ============================================================ */
 window.validateModels=function(){
-  const want={sq:[1,1,1,1],wh:[1,1,2,2],rect:[1,1,2,2],eq:[1,1,1],rt:[1,1,Math.SQRT2],iso:[1,2,2]}, errs=[], notes=[];
+  const want={sq:[1,1,1,1],wh:[1,1,2,2],rect:[.5,.5,1,1],eq:[1,1,1],rt:[1,1,Math.SQRT2],iso:[1,2,2]}, errs=[], notes=[];
   const E=1e-6, sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],
     cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], len=a=>Math.hypot(...a);
   const edges=t=>t.v.map((p,k)=>[p,t.v[(k+1)%t.v.length]]);

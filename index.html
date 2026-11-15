@@ -997,9 +997,44 @@ function tone(f,t0,dur,type,vol){
 const snap=()=>tone(520,0,.12,'triangle',.25);
 const click=()=>tone(700,0,.05,'sine',.1);
 const fanfare=()=>[523,659,784,1047,784,1047].forEach((f,i)=>tone(f,i*.14,.22,'triangle',.22));
-function speak(txt){
+/* Pick the most natural-sounding English voice available (Android Chrome: Google network voices; others: Premium/Enhanced/Natural). */
+let voice=null;
+function pickVoice(){
+  const vs=(window.speechSynthesis&&speechSynthesis.getVoices())||[];
+  const en=vs.filter(v=>/^en([-_]|$)/i.test(v.lang));
+  if(!en.length) return;
+  const score=v=>{
+    let n=0;
+    if(/natural|neural|premium|enhanced|online/i.test(v.name)) n+=6;
+    if(/google/i.test(v.name)) n+=4;
+    if(v.localService===false) n+=3;            // network voices are usually the best on Android
+    if(/female|samantha|aria|jenny|zira|karen|moira|serena/i.test(v.name)) n+=2;
+    if(/en[-_](IN|US|GB)/i.test(v.lang)) n+=1;
+    return n;
+  };
+  voice=en.sort((a,b)=>score(b)-score(a))[0];
+}
+if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+// mood: 'cheer' = excited, 'warn' = gentle, default = calm and friendly
+const MOODS={cheer:{rate:1.02,pitch:1.45},warn:{rate:.88,pitch:1.0},say:{rate:.92,pitch:1.2}};
+function speak(txt,mood){
   if(muted||!('speechSynthesis' in window)) return;
-  try{speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(txt); u.rate=.9; u.pitch=1.15; speechSynthesis.speak(u);}catch(e){}
+  try{
+    speechSynthesis.cancel();
+    const m=MOODS[mood||'say'];
+    // split on sentences so each gets a natural pause; "!" lines are lifted a little
+    const parts=txt.match(/[^.!?]+[.!?]*/g)||[txt];
+    parts.forEach(p=>{
+      if(!p.trim()) return;
+      const u=new SpeechSynthesisUtterance(p.trim());
+      if(voice){u.voice=voice;u.lang=voice.lang;}
+      const excited=/!/.test(p);
+      u.rate=m.rate+(excited&&mood!=='cheer'?.04:0);
+      u.pitch=m.pitch+(excited?.12:0);
+      u.volume=1;
+      speechSynthesis.speak(u);
+    });
+  }catch(e){}
 }
 function hush(){try{window.speechSynthesis&&speechSynthesis.cancel();}catch(e){}}
 function paintMute(){document.querySelectorAll('.mute').forEach(b=>b.textContent=muted?'🔇':'🔊');}
@@ -1076,7 +1111,7 @@ function buildPick(){
     c.onclick=()=>{
       if(i>=open){
         tone(180,0,.18,'square',.12); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
-        speak('Finish the ones with a green tick first.'); return;
+        speak('Finish the ones with a green tick first.','warn'); return;
       }
       click();model=m;buildNeed();show('need');speak(m.name);
     };
@@ -1174,7 +1209,7 @@ function finish(){
     $('done').prepend(s);
   }
   parts=[]; burst(140);
-  fanfare(); setTimeout(()=>speak(cheer+(kid?', '+kid:'')+'! '+extra+' You built a '+model.name+'!'+(opened?' You opened new ones to build!':'')),700);
+  fanfare(); setTimeout(()=>speak(cheer+(kid?', '+kid:'')+'! '+extra+' You built a '+model.name+'!'+(opened?' You opened new ones to build!':''),'cheer'),700);
 }
 function burst(n){
   const cols=Object.values(COL);
